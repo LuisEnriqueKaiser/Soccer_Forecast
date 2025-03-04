@@ -1,0 +1,18 @@
+data_dir: "data"
+
+# Use only FBref data
+fbref_leagues:
+  - "ENG-Premier League"
+  
+fbref_seasons:
+  - "2021-2022"
+  - "2022-2023"
+  - "2023-2024"
+  - "2024-2025"
+
+# Other keys are not used in this version.
+leagues: []
+seasons: []
+
+scrape_odds: false
+forecast_upcoming: false

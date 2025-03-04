@@ -1,0 +1,9 @@
+numpy
+pandas
+scikit-learn
+soccerdata
+requests
+beautifulsoup4
+matplotlib
+seaborn
+PyYAML
