@@ -48,6 +48,7 @@ def compute_mean_stat_last_n_games(
 
     # Prepare names for the two new columns
     home_output_col = f"home_mean_{stat_name}_last_{n}"
+    print(home_output_col)
     away_output_col = f"away_mean_{stat_name}_last_{n}"
 
     # Iterate through each match (row)
@@ -145,15 +146,29 @@ pairs = [
 ]
 
 df = pd.read_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/processed/PL_merged_dataset_cleaned.csv")
-n = 5
+n = 3
 # create features for every pair
 for home_col, away_col, name in pairs:
     df = compute_mean_stat_last_n_games(
         df, n, home_col, away_col, name
     )
 # drop the old columns
-df.drop(columns=[col for col in df.columns if "home_" in col or "away_" in col], inplace=True)
-df['match_result'] = df['score'].apply(get_match_result)
 
+
+to_drop = [ 'Home_Tackles.1_TklW', 'Home_Tackles.2_Def 3rd',
+       'Home_Tackles.4_Att 3rd', 'Home_Blocks.1_Sh', 'Away_Tackles_Tkl',
+       'Away_Tackles.1_TklW', 'Away_Tackles.2_Def 3rd',
+       'Away_Tackles.4_Att 3rd', 'Away_Blocks.1_Sh', 'Home_Total.3_TotDist',
+       'Home_Total.4_PrgDist', 'Home_xAG_nan', 'Home_xA_nan',
+       'Away_Total.3_TotDist', 'Away_Total.4_PrgDist', 'Away_xAG_nan',
+       'Away_xA_nan', 'Home_Touches.3_Mid 3rd', 'Home_Touches.4_Att 3rd',
+       'Home_Carries.2_PrgDist', 'Away_Touches.3_Mid 3rd',
+       'Away_Touches.4_Att 3rd', 'Away_Carries.2_PrgDist', 'Home_Standard_Gls',
+       'Home_Expected_xG', 'Home_Expected.1_npxG', 'Home_Expected.2_npxG/Sh',
+       'Home_Expected.3_G-xG', 'Home_Expected.4_np:G-xG', 'Away_Standard_Gls',
+       'Away_Expected_xG', 'Away_Expected.1_npxG', 'Away_Expected.2_npxG/Sh',
+       'Away_Expected.3_G-xG', 'Away_Expected.4_np:G-xG']
+df = df.drop(to_drop, axis=1)
+df['match_result'] = df['score'].apply(get_match_result)
 # save the final df 
 df.to_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/PL_final_dataset.csv", index=False)
