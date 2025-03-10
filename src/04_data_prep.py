@@ -41,10 +41,25 @@ def drop_old_incomplete_rows(df, date_col, frac_threshold=0.5):
     df_clean.reset_index(drop=True, inplace=True)
     return df_clean
 
+# Define function to assign season based on the month and year
+def assign_season(date):
+    year = date.year
+    month = date.month
+    if month >= 8:  # August to December
+        return f"{year}-{year+1}"
+    else:  # January to May (part of the previous season)
+        return f"{year-1}-{year}"
+
 
 
 df = pd.read_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/processed/PL_merged_dataset.csv")
 df = drop_old_incomplete_rows(df, date_col="date", frac_threshold=0.5)
+
+# Apply the function to assign season
+df['season'] = df['date'].apply(assign_season)
+# Number each unique season
+df['season_number'] = df['season'].astype('category').cat.codes + 1
+
 # save the cleaned dataset
 df.to_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/processed/PL_merged_dataset_cleaned.csv", index=False)
 
