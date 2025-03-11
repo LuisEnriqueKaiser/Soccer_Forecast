@@ -178,10 +178,23 @@ def main():
     # Use separate CSV files for training and testing
     train_csv_path = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv"
     test_csv_path  = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
-    
+    # drop these variables from the test 
+    # drop test_data$prob_away_mean  <- mean_probs_test[, 1]
+    # test_data$prob_away_lower <- p1_quants[1, ]
+    # test_data$prob_away_upper <- p1_quants[2, ]
+
+    # test_data$prob_draw_mean  <- mean_probs_test[, 2]
+    # test_data$prob_draw_lower <- p2_quants[1, ]
+    # test_data$prob_draw_upper <- p2_quants[2, ]
+
+    # test_data$prob_home_mean  <- mean_probs_test[, 3]
+    # test_data$prob_home_lower <- p3_quants[1, ]
+    # test_data$prob_home_upper <- p3_quants[2, ]
+
     df_train = load_data(train_csv_path)
     df_test = load_data(test_csv_path)
-    
+    to_drop = ['prob_away_mean', 'prob_away_lower', 'prob_away_upper', 'prob_draw_mean', 'prob_draw_lower', 'prob_draw_upper', 'prob_home_mean', 'prob_home_lower', 'prob_home_upper']
+    df_test = df_test.drop(to_drop, axis=1)
     # Preprocess each dataset: drop rows with too many missing values and impute missing values
     df_train = drop_old_incomplete_rows(df_train, date_col="date", frac_threshold=0.5)
     df_test = drop_old_incomplete_rows(df_test, date_col="date", frac_threshold=0.5)
@@ -219,7 +232,16 @@ def main():
     best_rf = tune_random_forest(X_train, y_train)
     print("evaluating model")
     y_pred_rf, y_proba_rf, acc_rf, ll_rf, f1_rf = evaluate_rf_model(best_rf, X_test, y_test)
-    
+    print(y_proba_rf)
+    # add the rf predictions to the test dataframe
+    df_test['rf_prediction'] = y_pred_rf
+    #df_test['rf_prediction_proba'] = y_proba_rf.tolist()
+    df_test['rf_prediction_proba_home_win'] = y_proba_rf[:,2]
+    df_test['rf_prediction_proba_draw'] = y_proba_rf[:,1]
+    df_test['rf_prediction_proba_away_win'] = y_proba_rf[:,0]
+
+
+
     # Save confusion matrix plot for Random Forest
     cm_rf = plot_and_save_confusion_matrix(y_test, y_pred_rf, 
                    class_names=["Away win", "Draw", "Home win"], 
@@ -235,7 +257,13 @@ def main():
     
     # Run Logistic Regression model
     pipe_logit, y_pred_logit, y_proba_logit, acc_logit, ll_logit, f1_logit = run_logistic_regression(X_train, y_train, X_test, y_test)
-    
+    # add the logit predictions to the test dataframe
+    df_test['logit_prediction'] = y_pred_logit
+    df_test['logit_prediction_proba_home_win'] = y_proba_logit[:,2]
+    df_test['logit_prediction_proba_draw'] = y_proba_logit[:,1]
+    df_test['logit_prediction_proba_away_win'] = y_proba_logit[:,0]
+    #safe updated data
+    df_test.to_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv", index=False)
     # Save Logistic Regression confusion matrix plot
     cm_logit = plot_and_save_confusion_matrix(y_test, y_pred_logit, 
                    class_names=["Away win", "Draw", "Home win"], 
