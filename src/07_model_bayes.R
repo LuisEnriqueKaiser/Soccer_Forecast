@@ -1,13 +1,10 @@
-# for the bayesian model work in R as it has a better package support and was taught throughout the course
-# idea is to use stan, what we used in the bayesina modelling course 
-# offers exactly the advantages i was trying to accomplish in my project
-# Load required packages
-# Load required packages
+###############################################################################
+# Bayesian ordinal model with an explicit home-advantage parameter
+# using Stan and including the code to produce credible intervals
+# for per-match outcome probabilities.
+###############################################################################
+
 rm(list = ls())
-library(rstan)
-library(dplyr)
-library(ggplot2)
-# Load required packages
 library(rstan)
 library(dplyr)
 library(ggplot2)
@@ -16,103 +13,117 @@ library(ggplot2)
 options(mc.cores = parallel::detectCores())
 
 # -----------------------------------------------------------------------------
-# Updated Stan model code with additional predictors (X) and coefficients (beta)
+# 1) Stan Model Code
 # -----------------------------------------------------------------------------
 stan_model_code <- "
 data {
-  int<lower=1> N;                // number of matches
-  int<lower=2> K;                // number of outcome categories (e.g., 3 for away win, draw, home win)
-  int<lower=1> T;                // number of teams
-  int<lower=1,upper=T> home_team[N]; // index of home team for each match
-  int<lower=1,upper=T> away_team[N]; // index of away team for each match
-  int<lower=1,upper=K> y[N];       // observed outcome (as integers 1, 2, ..., K)
-  
-  int<lower=0> P;                // number of additional predictors
-  matrix[N, P] X;                // predictor matrix (match-specific covariates known on game day)
+  int<lower=1> N;                 // number of matches
+  int<lower=2> K;                 // number of outcome categories (3 for away win, draw, home win)
+  int<lower=1> T;                 // number of teams
+  int<lower=1,upper=T> home_team[N]; 
+  int<lower=1,upper=T> away_team[N];
+  int<lower=1,upper=K> y[N];      // observed outcome as 1..K
+
+  int<lower=0> P;                 // number of additional predictors
+  matrix[N, P] X;                 // predictor matrix (match-specific covariates)
 }
 parameters {
-  vector[T] team_strength;       // latent strength for each team
-  ordered[K-1] c;                // threshold (cutpoint) parameters (ensures ordering)
-  real<lower=0> sigma_team;      // standard deviation (hyperparameter) for team strengths
+  // Team-level random effects
+  vector[T] team_strength;        // latent strength for each team
+  real home_adv;                  // home-field advantage parameter
   
-  vector[P] beta;              // coefficients for additional predictors
+  // Ordered logistic cutpoints
+  ordered[K-1] c;                
+
+  // Hyperparameter for team_strength prior
+  real<lower=0> sigma_team;      
+
+  // Coefficients for additional predictors
+  vector[P] beta;
 }
 model {
   // Priors
   sigma_team ~ normal(0, 5);
   team_strength ~ normal(0, sigma_team);
+
+  // Weakly informative prior for home-field advantage
+  home_adv ~ normal(0, 1);
+
   c ~ normal(0, 5);
-  beta ~ normal(0, 5);  // weakly informative prior for covariate coefficients
-  
-  // Likelihood: latent score = team strength difference + linear predictor from X
+  beta ~ normal(0, 5);
+
+  // Likelihood: for each match, the latent score 
+  //   (home team's strength + home_adv) - (away team's strength) + X*beta
   for (n in 1:N) {
-    real eta = team_strength[home_team[n]] - team_strength[away_team[n]] + dot_product(X[n], beta);
+    real eta = (team_strength[home_team[n]] + home_adv)
+               - team_strength[away_team[n]]
+               + dot_product(X[n], beta);
     y[n] ~ ordered_logistic(eta, c);
   }
 }
 generated quantities {
+  // We store the latent score 'eta' for each match to facilitate posterior predictions
   vector[N] eta;
   for (n in 1:N) {
-    eta[n] = team_strength[home_team[n]] - team_strength[away_team[n]] + dot_product(X[n], beta);
+    eta[n] = (team_strength[home_team[n]] + home_adv)
+             - team_strength[away_team[n]]
+             + dot_product(X[n], beta);
   }
 }
 "
 
 # -----------------------------------------------------------------------------
-# Data Preparation
+# 2) TRAINING DATA PREPARATION
 # -----------------------------------------------------------------------------
-# Read in the dataset (assumed to be the final processed file)
-data_raw <- read.csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv", 
-                     stringsAsFactors = FALSE)
+data_raw <- read.csv(
+  "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv", 
+  stringsAsFactors = FALSE
+)
 
-
-# Recode match outcome directly from match_result.
-# We assume match_result is coded as -1 (away win), 0 (draw), and 1 (home win).
-# The recoding converts these to an ordered integer variable: 1, 2, 3.
+# Convert match_result: -1=Away Win, 0=Draw, 1=Home Win --> 1,2,3 (for Stan)
 data_raw <- data_raw %>%
-  mutate(match_result_cat = as.integer(factor(match_result,
-                                              levels = c(-1, 0, 1),
-                                              labels = c(1, 2, 3))))
+  mutate(
+    match_result_cat = as.integer(
+      factor(match_result, levels = c(-1, 0, 1), labels = c(1, 2, 3))
+    )
+  )
 
-# Drop non-feature columns that are not available on game day
-# drop everything except the 6 principal components and the outcome variable 
-
-principal_component_names = c("home_team", "away_team","match_result_cat","PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7",
-                              "PC8", "PC9")
+# Keep only relevant columns
+principal_component_names <- c("home_team", "away_team", "match_result_cat",
+                               "PC1", "PC2", "PC3", "PC4", "PC5", 
+                               "PC6", "PC7", "PC8", "PC9")
 data_raw <- data_raw[, (names(data_raw) %in% principal_component_names)]
-#non_feature_cols <- c("home_win", "date", 
-#                      "day", "score", "time", "Match_report", "notes", 
- #                     "venue", "referee", "game_id")
 
-# Create a team index: get the unique team names from home_team and away_team
+# Team indices
 teams <- sort(unique(c(data_raw$home_team, data_raw$away_team)))
 T_num <- length(teams)
-team_index <- setNames(1:T_num, teams)
+team_index <- setNames(seq_len(T_num), teams)
 
-# Map team names to their integer indices
 data_raw <- data_raw %>%
-  mutate(home_team_idx = team_index[home_team],
-         away_team_idx = team_index[away_team])
+  mutate(
+    home_team_idx = team_index[home_team],
+    away_team_idx = team_index[away_team]
+  )
 
-# Identify predictor columns to include in X.
-# Exclude outcome-related columns and team identifiers.
-predictor_cols <- setdiff(names(data_raw), c("match_result", "match_result_cat", "home_team", "away_team",
-                                             "home_team_idx", "away_team_idx"))
+# Identify predictor columns (excluding outcome/team/indices)
+predictor_cols <- setdiff(
+  names(data_raw),
+  c("match_result", "match_result_cat", 
+    "home_team", "away_team",
+    "home_team_idx", "away_team_idx")
+)
 
-# Drop rows with missing values in predictor columns (Stan does not support NA values)
+# Drop rows with missing predictor values
 data_raw <- data_raw[complete.cases(data_raw[, predictor_cols]), ]
 
-# Convert the predictors to a matrix.
+# Build matrix X
 X <- as.matrix(data_raw[, predictor_cols])
+P <- ncol(X)
 
-P <- ncol(X)  # number of predictors
-
-# -----------------------------------------------------------------------------
-# Prepare data list for Stan
-# -----------------------------------------------------------------------------
+# Stan data list
 stan_data <- list(
   N = nrow(data_raw),
-  K = 3,  # number of outcome categories (1, 2, 3)
+  K = 3,  # 3 outcome categories
   T = T_num,
   home_team = data_raw$home_team_idx,
   away_team = data_raw$away_team_idx,
@@ -122,52 +133,58 @@ stan_data <- list(
 )
 
 # -----------------------------------------------------------------------------
-# Model Fitting using RStan
+# 3) MODEL FITTING WITH STAN
 # -----------------------------------------------------------------------------
-# Compile the model
 stan_model <- stan_model(model_code = stan_model_code)
 
-# Fit the model via MCMC sampling
-fit <- sampling(stan_model,
-                data = stan_data,
-                iter = 30000,       # total iterations per chain
-                warmup = 2000,     # warmup (burn-in) iterations
-                chains = 4,        # number of chains
-                seed = 123,        # for reproducibility
-                control = list(adapt_delta = 0.95),
-                refresh = 100)
+fit <- sampling(
+  stan_model,
+  data    = stan_data,
+  iter    = 6000,    # total iterations per chain
+  warmup  = 2000,    # burn-in
+  chains  = 4,       
+  seed    = 123,     
+  control = list(adapt_delta = 0.95),
+  refresh = 100
+)
 
-# Print a summary of the posterior distributions
-print(fit, pars = c("team_strength", "c", "sigma_team", "beta"))
+print(fit, pars = c("team_strength", "home_adv", "c", "sigma_team", "beta"))
 
 # -----------------------------------------------------------------------------
-# Post-processing: extract and plot team strength estimates
+# 4) POSTERIOR DIAGNOSTICS / TEAM STRENGTHS
 # -----------------------------------------------------------------------------
-posterior_samples <- extract(fit)
-traceplot(fit, pars = c("sigma_team", "team_strength[1]", "beta[2]"))
+posterior_samples <- rstan::extract(fit)
 
-# Calculate the posterior mean for team strengths
+# Traceplots for a few parameters
+traceplot(fit, pars = c("home_adv", "sigma_team", "team_strength[1]", "beta[1]"))
+
+# Mean team strengths
 team_strength_means <- colMeans(posterior_samples$team_strength)
 team_strength_df <- data.frame(
   team = teams,
   strength = team_strength_means
 )
 
-# Plot team strengths
+# Quick visual
 ggplot(team_strength_df, aes(x = reorder(team, strength), y = strength)) +
   geom_point() +
   coord_flip() +
-  xlab("Team") +
-  ylab("Estimated Strength") +
-  ggtitle("Posterior Mean Estimates of Team Strengths")
+  labs(x = "Team", y = "Estimated Strength", 
+       title = "Posterior Mean Estimates of Team Strengths (Home Advantage Mode)")
 
+# Check the posterior for home_adv
+home_adv_mean <- mean(posterior_samples$home_adv)
+home_adv_ci <- quantile(posterior_samples$home_adv, probs = c(0.025, 0.975))
+cat("Home advantage mean:", home_adv_mean, 
+    "95% CI:", home_adv_ci[1], "to", home_adv_ci[2], "\n")
 
-
-
-
-
+# -----------------------------------------------------------------------------
+# 5) OPTIONAL: TRAINING SET POSTERIOR PREDICTIVE CHECK
+# -----------------------------------------------------------------------------
 posterior <- rstan::extract(fit)
 thin_factor <- 10
+
+# Thinned posterior to reduce loops
 posterior_thinned <- lapply(posterior, function(x) {
   if (is.matrix(x) || is.data.frame(x)) {
     x[seq(1, nrow(x), by = thin_factor), , drop = FALSE]
@@ -177,24 +194,14 @@ posterior_thinned <- lapply(posterior, function(x) {
     x
   }
 })
-# For convenience:
-S <- dim(posterior_thinned$c)[1]     # number of draws (posterior samples)
-N <- dim(posterior_thinned$eta)[2]   # number of matches
 
-# ---------------------------------------------------------------------------
-# 2. Compute posterior predictive probabilities for each match
-# ---------------------------------------------------------------------------
-# For a 3-category ordered logistic, the probabilities are:
-#   P(y=1) = logistic(c1 - eta)
-#   P(y=2) = logistic(c2 - eta) - logistic(c1 - eta)
-#   P(y=3) = 1 - logistic(c2 - eta)
+S <- dim(posterior_thinned$c)[1]     # thinned draws
+N <- dim(posterior_thinned$eta)[2]   # matches
 
-# We'll store them in an array [N, 3, S].
 post_probs <- array(0, dim = c(N, 3, S))
-
 for (s in 1:S) {
-  c1 <- posterior_thinned$c[s,1]  # first cutpoint
-  c2 <- posterior_thinned$c[s,2]  # second cutpoint
+  c1 <- posterior_thinned$c[s,1]
+  c2 <- posterior_thinned$c[s,2]
   for (n in 1:N) {
     eta_n <- posterior_thinned$eta[s,n]
     p1 <- plogis(c1 - eta_n)
@@ -205,169 +212,138 @@ for (s in 1:S) {
   }
 }
 
-# ---------------------------------------------------------------------------
-# 3. Average over posterior draws to get mean predicted probabilities
-# ---------------------------------------------------------------------------
-# mean_probs[n, k] = average probability of category k for match n
-mean_probs <- apply(post_probs, c(1,2), mean)  # now [N, 3]
-
-# Derive predicted category = argmax across the 3 categories
-predicted_cat <- apply(mean_probs, 1, which.max)  # in {1,2,3}
-
-# ---------------------------------------------------------------------------
-# 4. Compare to actual outcome in your training data
-# ---------------------------------------------------------------------------
-# We assume your original data frame has 'match_result_cat' in {1,2,3}.
-true_cat <- data_raw$match_result_cat  # must match the order in stan_data$y
+mean_probs <- apply(post_probs, c(1,2), mean)
+predicted_cat <- apply(mean_probs, 1, which.max)
+true_cat <- data_raw$match_result_cat
 accuracy <- mean(predicted_cat == true_cat, na.rm = TRUE)
+cat("In-sample accuracy (train):", accuracy, "\n")
 
-cat("In-sample accuracy:", accuracy, "\n")
-
-# If you want to see predicted probabilities for each match, 'mean_probs' is your Nx3 matrix.
-# Each row sums to 1 and you can inspect them or compare them to the actual outcomes.
-
-
-
-
-
-
-
-
-
-
-library(reshape2)
-
-
+###############################################################################
+# 6) TEST SET PREDICTIONS
+###############################################################################
 test_file <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
 test_data <- read.csv(test_file, stringsAsFactors = FALSE)
 
-
-
-# (Optional) Check a few rows
-print(head(test_data))
-
-
-
-
-# If necessary, recode match_result to match_result_cat.
-# (Assuming it’s already done; if not, uncomment the next lines.)
+# Recode outcome if necessary
 test_data <- test_data %>%
-   mutate(match_result_cat = as.integer(factor(match_result,
-                                               levels = c(-1, 0, 1),
-                                               labels = c(1, 2, 3))))
+  mutate(
+    match_result_cat = as.integer(
+      factor(match_result, levels = c(-1, 0, 1), labels = c(1, 2, 3))
+    )
+  )
 
-# -----------------------------------------------------------------------------
-# Create Team Index for Test Data
-# -----------------------------------------------------------------------------
-# IMPORTANT: The team index must match that used in training.
-# Here, we assume that the set of teams in test data is a subset of the training teams.
+# Must reuse the same teams for consistent indexing
 teams <- sort(unique(c(test_data$home_team, test_data$away_team)))
 T_num <- length(teams)
-team_index <- setNames(1:T_num, teams)
-test_data <- test_data %>%
-  mutate(home_team_idx = team_index[home_team],
-         away_team_idx = team_index[away_team])
+team_index <- setNames(seq_len(T_num), teams)
 
-# -----------------------------------------------------------------------------
-# Build Predictor Matrix for Test Data
-# -----------------------------------------------------------------------------
-# We assume that the model was built using the six principal components.
-predictor_cols <- c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9")
+test_data <- test_data %>%
+  mutate(
+    home_team_idx = team_index[home_team],
+    away_team_idx = team_index[away_team]
+  )
+
+# Build test predictors
+predictor_cols <- c("PC1","PC2","PC3","PC4","PC5","PC6","PC7")
 X_test <- as.matrix(test_data[, predictor_cols])
 P_test <- ncol(X_test)
 
-# -----------------------------------------------------------------------------
-# Build stan_data list for test predictions
-# -----------------------------------------------------------------------------
 stan_data_test <- list(
   N = nrow(test_data),
-  K = 3,  # outcomes: 1 (away win), 2 (draw), 3 (home win)
+  K = 3,
   T = T_num,
   home_team = test_data$home_team_idx,
   away_team = test_data$away_team_idx,
-  y = test_data$match_result_cat,  # observed outcomes (for evaluation)
+  y = test_data$match_result_cat,
   P = P_test,
   X = X_test
 )
 
-# -----------------------------------------------------------------------------
-# In-Sample (Test) Prediction Using the Fitted Stan Model
-# -----------------------------------------------------------------------------
-# We extract the posterior samples from the fitted model (fit)
+# Compute posterior predictive probabilities for the test set
 posterior <- rstan::extract(fit)
+S_full <- dim(posterior$c)[1]     # number of unthinned draws
+N_test <- stan_data_test$N
 
-# Dimensions:
-S <- dim(posterior$c)[1]     # number of posterior draws
-N_test <- stan_data_test$N   # number of test matches
-
-# We compute the latent score for each test match and each posterior draw.
-# For each draw s and match n, the latent score is:
-#   eta_test = team_strength[home_team] - team_strength[away_team] + dot_product(X_test[n,], beta)
-# Then, for an ordered logistic model with 3 categories, the probabilities are:
-#   P(y=1) = plogis(c1 - eta_test)
-#   P(y=2) = plogis(c2 - eta_test) - plogis(c1 - eta_test)
-#   P(y=3) = 1 - plogis(c2 - eta_test)
-
-# We'll compute these in a vectorized manner using loops over draws only (to avoid a nested S x N loop).
-post_probs_test <- array(0, dim = c(N_test, 3, S))
-
-for (s in 1:S) {
-  # For draw s, get the cutpoints and parameters:
+post_probs_test <- array(0, dim = c(N_test, 3, S_full))
+for (s in 1:S_full) {
   c1 <- posterior$c[s, 1]
   c2 <- posterior$c[s, 2]
-  ts <- posterior$team_strength[s, ]  # vector of team strengths
-  beta_s <- posterior$beta[s, ]        # vector of coefficients
+  ts <- posterior$team_strength[s, ]
+  beta_s <- posterior$beta[s, ]
+  home_adv_s <- posterior$home_adv[s]
   
-  # Compute the latent score for all test matches in one vectorized operation:
-  # Note: X_test is a matrix of size N_test x P.
-  eta_test <- ts[test_data$home_team_idx] - ts[test_data$away_team_idx] + X_test %*% beta_s
+  # Vectorized latent score with home advantage
+  eta_test <- (ts[test_data$home_team_idx] + home_adv_s) -
+    ts[test_data$away_team_idx] +
+    X_test %*% beta_s
   
-  # Compute probabilities using vectorized plogis (which is essentially logistic function)
-  p1 <- plogis(c1 - eta_test)         # probability of outcome 1 for all matches
-  p2 <- plogis(c2 - eta_test)         # probability threshold for outcome 2
+  p1 <- plogis(c1 - eta_test) 
+  p2 <- plogis(c2 - eta_test)
   
-  # Store probabilities for each test match:
   post_probs_test[, 1, s] <- p1
   post_probs_test[, 2, s] <- p2 - p1
   post_probs_test[, 3, s] <- 1 - p2
 }
 
-# Average over posterior draws to obtain mean predicted probabilities for each test match
-mean_probs_test <- apply(post_probs_test, c(1, 2), mean)  # matrix [N_test x 3]
-
-# Predicted category for each match: choose the category with highest mean probability
+# Mean probability across posterior draws
+mean_probs_test <- apply(post_probs_test, c(1, 2), mean)  # Nx3
 predicted_cat_test <- apply(mean_probs_test, 1, which.max)
-# -----------------------------------------------------------------------------
-# Evaluate Out-of-Sample Predictions: Confusion Matrix & Accuracy
-# -----------------------------------------------------------------------------
-true_cat_test <- test_data$match_result_cat  # numeric categories: 1=Home Win, 2=Draw, 3=Away Win
+
+true_cat_test <- test_data$match_result_cat
 accuracy_test <- mean(predicted_cat_test == true_cat_test, na.rm = TRUE)
 cat("Out-of-sample (test) accuracy:", accuracy_test, "\n")
 
-# Create a standard confusion matrix: rows = Actual, cols = Predicted
+# Simple confusion matrix
 conf_matrix_test <- table(Actual = true_cat_test, Predicted = predicted_cat_test)
 cat("Out-of-sample (test) confusion matrix:\n")
 print(conf_matrix_test)
 
-# Convert to data frame for plotting
+# Quick confusion matrix plot
 conf_df_test <- as.data.frame(conf_matrix_test)
 colnames(conf_df_test) <- c("Actual", "Predicted", "Freq")
+conf_df_test$Actual <- factor(conf_df_test$Actual, levels = c(1, 2, 3), 
+                              labels = c("Away Win", "Draw", "Home Win"))
+conf_df_test$Predicted <- factor(conf_df_test$Predicted, levels = c(1, 2, 3), 
+                                 labels = c("Away Win", "Draw", "Home Win"))
 
-# Optional: Relabel numeric outcomes as factors for nicer plotting
-conf_df_test$Actual <- factor(conf_df_test$Actual,
-                              levels = c(1, 2, 3),
-                              labels = c("Home Win", "Draw", "Away Win"))
-conf_df_test$Predicted <- factor(conf_df_test$Predicted,
-                                 levels = c(1, 2, 3),
-                                 labels = c("Home Win", "Draw", "Away Win"))
-
-# Plot confusion matrix: x-axis = Predicted, y-axis = Actual
 ggplot(conf_df_test, aes(x = Predicted, y = Actual, fill = Freq)) +
   geom_tile(color = "grey70") +
   geom_text(aes(label = Freq), color = "black") +
   scale_fill_gradient(low = "white", high = "blue") +
-  xlab("Predicted Result") +
-  ylab("Actual Result") +
-  ggtitle("Out-of-sample Confusion Matrix") +
+  labs(x="Predicted Result", y="Actual Result",
+       title="Out-of-sample Confusion Matrix") +
   theme_minimal()
 
+###############################################################################
+# 7) ADD CREDIBLE INTERVALS & SAVE TEST RESULTS
+###############################################################################
+p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.025, 0.975))
+p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.025, 0.975))
+p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.025, 0.975))
+
+test_data$prob_away_mean  <- mean_probs_test[, 1]
+test_data$prob_away_lower <- p1_quants[1, ]
+test_data$prob_away_upper <- p1_quants[2, ]
+
+test_data$prob_draw_mean  <- mean_probs_test[, 2]
+test_data$prob_draw_lower <- p2_quants[1, ]
+test_data$prob_draw_upper <- p2_quants[2, ]
+
+test_data$prob_home_mean  <- mean_probs_test[, 3]
+test_data$prob_home_lower <- p3_quants[1, ]
+test_data$prob_home_upper <- p3_quants[2, ]
+
+# Add predicted category & label
+test_data$predicted_category <- predicted_cat_test
+test_data$predicted_label <- factor(
+  test_data$predicted_category,
+  levels = c(1, 2, 3),
+  labels = c("Away Win", "Draw", "Home Win")
+)
+
+# Keep the true category if desired
+test_data$true_category <- true_cat_test
+
+# Write out
+write.csv(test_data, "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv", row.names = FALSE)
+cat("Saved 'test_data_with_predictions_home_adv.csv' with mean probabilities and 95% CIs.\n")
