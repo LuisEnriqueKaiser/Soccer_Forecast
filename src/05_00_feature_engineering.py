@@ -183,6 +183,28 @@ def compute_pi_rating_online(df):
     df['away_pi_rating'] = away_pi
     return df
 
+def implied_prob(df, home_odd, draw_odd, away_odd3):
+    """
+    Compute implied probabilities from odds. note that they have to add up to one 
+    so i "clean" them in this way
+
+    dynamic naming based on the name of the odd
+    """
+    home_col = f"implied_prob_home_{home_odd}"
+    draw_col = f"implied_prob_draw_{draw_odd}"
+    away_col = f"implied_prob_away_{away_odd3}"
+
+    df[home_col] = 1/df[home_odd]
+    df[draw_col] = 1/df[draw_odd]
+    df[away_col] = 1/df[away_odd3]
+    
+    df[home_col] = df[home_col]/(df[home_col]+df[draw_col]+df[away_col])
+    df[away_col] = df[draw_col]/(df[home_col]+df[draw_col]+df[away_col])
+    df[away_col] = df[away_col]/(df[home_col]+df[draw_col]+df[away_col])
+    return df
+
+
+
 ###############################################################################
 # Main script
 ###############################################################################
@@ -194,7 +216,7 @@ def main():
 
     # Read data
     df = pd.read_csv(INPUT_PATH)
-    n = 7
+    n = 3
 
     # 1) Rolling mean stats for each pair.
     #    Examples of stats: xG, tackles, passes, progressive carries, possession, etc.
@@ -220,17 +242,20 @@ def main():
 
     # 2a) Create difference & ratio features from the rolling means
     #     (these help model the relative matchup between teams)
+
+    # dynamic naming of the new rolling stats
     new_rolling_stats = [
-        "mean_xg_last_7",
-        "mean_Tackles_Tkl_last_7",
-        "mean_Touches_Mid3rd_last_7",
-        "mean_Touches_Att3rd_last_7",
-        "mean_Carries_PrgDist_last_7",
-        "mean_Standard_Gls_last_7",
-        "mean_Expected_xG_last_7",
-        "mean_Expected_npxG_last_7",
-        # Add "mean_Possession_last_7" here if you included it above
+        "mean_xg_last_3",
+        "mean_Tackles_Tkl_last_3",
+        "mean_Touches_Mid3rd_last_3",
+        "mean_Touches_Att3rd_last_3",
+        "mean_Carries_PrgDist_last_3",
+        "mean_Standard_Gls_last_3",
+        "mean_Expected_xG_last_3",
+        "mean_Expected_npxG_last_3",
+        # Add "mean_Possession_last_3" here if you included it above
     ]
+
     for stat_name in new_rolling_stats:
         home_col = f"home_{stat_name}"
         away_col = f"away_{stat_name}"
@@ -238,6 +263,7 @@ def main():
 
     # Also, difference in Pi rating can help indicate relative team strength
     df["diff_pi_rating"] = df["home_pi_rating"] - df["away_pi_rating"]
+
 
     # 3) Drop columns not needed.
     #    Many of your new features are stored as 'home_mean_...', 'away_mean_...', or
@@ -262,21 +288,27 @@ def main():
         'away_xg',
         'season',
         'Home_Expected.3_G-xG',
-        'Away_Expected.3_G-xG',
+        'Away_Expected.3_G-xG','Away_Expected.2_npxG.Sh',
         'attendance','Home_Total.3_TotDist', "Away_Tackles.1_TklW", "Home_Tackles.1_TklW",
         'Home_Tackles.2_Def 3rd', 'Away_Tackles.4_Att 3rd', 'Home_Expected.2_npxG/Sh',
         'Home_xA_nan', 'Home_Expected.4_np:G-xG','Away_Total.3_TotDist','Away_xA_nan','Home_Total.4_PrgDist','Home_xAG_nan','away_win','Away_xAG_nan',
-        'Away_Tackles.2_Def 3rd','Home_Blocks.1_Sh','Home_Blocks.1_Sh','Away_Expected.4_np:G-xG','Away_Total.4_PrgDist', 'Home_Tackles.4_Att 3rd','Away_Blocks.1_Sh'
+        'Away_Tackles.2_Def 3rd','Home_Blocks.1_Sh','Home_Blocks.1_Sh','Away_Expected.4_np:G-xG','Away_Total.4_PrgDist', 'Home_Tackles.4_Att 3rd','Away_Blocks.1_Sh', 'Away_Expected.2_npxG/Sh',
         # Potential columns with no further usage
         # 'Home_Possession', 'Away_Possession',
         # ... etc ...
     ]
+    odds_columns = ["B365H","B365D",	"B365A"	,"PSH"	,"PSD"	"PSA","WHH","WHD","WHA"]
+
+    df = implied_prob(df, "B365H", "B365D", "B365A")
+    df = implied_prob(df, "PSH", "PSD", "PSA")
+    df = implied_prob(df, "WHH", "WHD", "WHA")
+    #df.drop(columns=odds_columns, inplace=True, errors='ignore')
+
     df.drop(columns=to_drop, inplace=True, errors='ignore')
 
     # 4) Prepare data & form
     df = prepare_data(df)
     df = form_of_teams(df)
-
     # 5) drop incomplete rows, date filter, and do time-aware imputations
     df = drop_old_incomplete_rows(df, date_col="date", frac_threshold=0.5)
     df = df[df["date"] < pd.to_datetime("today")]
@@ -285,9 +317,11 @@ def main():
 
     # 6) Time-based train/test split (90% / 10%)
     n_total = len(df)
-    train_end = int(0.8 * n_total)
-    df_train = df.iloc[:train_end].reset_index(drop=True)
-    df_test  = df.iloc[train_end:].reset_index(drop=True)
+    # split based on date
+    # everything before august 2022 is train 
+    df_train = df[df["date"] < pd.to_datetime("2023-08-01")]
+    df_test = df[df["date"] >= pd.to_datetime("2023-08-01")]
+
 
     # 7) SAVE final train/test
     df_train.to_csv(TRAIN_OUTPUT_PATH, index=False)
@@ -295,7 +329,6 @@ def main():
 
     print(f"Saved training data to {TRAIN_OUTPUT_PATH}")
     print(f"Saved test data to {TEST_OUTPUT_PATH}")
-    print("Feature engineering & time-aware split complete (no PCA).")
 
 if __name__ == "__main__":
     main()

@@ -125,15 +125,13 @@ def plot_accuracy_by_matchweek(df_test, y_true, y_pred, week_col='week'):
 # -------------------------------
 def tune_random_forest(X_train, y_train):
     param_grid = {
-        'n_estimators': [100, 250],#, 300, 250],
-        'max_depth': [8],
-        'criterion': ['gini'],
-        'min_samples_split': [20],
-        'min_samples_leaf': [ 8],
-        'max_features': ['sqrt']
+        'n_estimators': [100, 200, 300],
+        'max_depth': [5, 10, 15],
+        'min_samples_split': [2, 5, 10],
+        'min_samples_leaf': [1, 2, 4]
     }
     tscv = TimeSeriesSplit(n_splits=5)
-    rf = RandomForestClassifier(random_state=42)
+    rf = RandomForestClassifier(random_state=42, class_weight='balanced')
     with parallel_backend('loky', n_jobs=-1):
         grid_search = GridSearchCV(
             estimator=rf,
@@ -198,7 +196,8 @@ def main():
     # Define non-feature columns to exclude
     non_feature_cols = ["match_result", "match_result_cat", "home_win", "date", 
                         "day", "score", "time", "Match_report", "notes", "away_win",
-                        "venue", "referee", "game_id", "home_team", "away_team"]
+                        "venue", "referee", "game_id", "home_team", "away_team",
+                        "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9"]
 
     # Identify feature columns (ensure train and test have common features)
     feature_cols_train = [col for col in df_train.columns if col not in non_feature_cols]

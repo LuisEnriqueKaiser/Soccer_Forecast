@@ -60,14 +60,14 @@ def main():
     X_train_scaled = scaler.fit_transform(df_train[numeric_cols])
     
     # Fit PCA on training set (choose the number of components as desired)
-    n_components = 9
+    n_components = 7
     pca = PCA(n_components=n_components)
     X_train_pca = pca.fit_transform(X_train_scaled)
     
     # Print explained variance ratio for inspection
     print("Explained variance ratio of PCA components:")
     print(pca.explained_variance_ratio_)
-    
+    print("Total explained variance:", pca.explained_variance_ratio_.sum())
     # Transform test set using the same scaler and PCA
     X_test_scaled = scaler.transform(df_test[numeric_cols])
     X_test_pca = pca.transform(X_test_scaled)
