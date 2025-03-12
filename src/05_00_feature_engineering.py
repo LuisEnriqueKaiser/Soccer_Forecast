@@ -203,7 +203,15 @@ def implied_prob(df, home_odd, draw_odd, away_odd3):
     df[away_col] = df[away_col]/(df[home_col]+df[draw_col]+df[away_col])
     return df
 
-
+def give_integer_to_teams(df):
+    """
+    Give an integer to each team
+    """
+    teams = pd.unique(df[['home_team', 'away_team']].values.ravel('K'))
+    team_dict = {team: i for i, team in enumerate(teams)}
+    df['home_team_integer'] = df['home_team'].map(team_dict)
+    df['away_team_integer'] = df['away_team'].map(team_dict)
+    return df
 
 ###############################################################################
 # Main script
@@ -303,7 +311,7 @@ def main():
     df = implied_prob(df, "PSH", "PSD", "PSA")
     df = implied_prob(df, "WHH", "WHD", "WHA")
     #df.drop(columns=odds_columns, inplace=True, errors='ignore')
-
+    df = give_integer_to_teams(df)
     df.drop(columns=to_drop, inplace=True, errors='ignore')
 
     # 4) Prepare data & form
@@ -318,9 +326,8 @@ def main():
     # 6) Time-based train/test split (90% / 10%)
     n_total = len(df)
     # split based on date
-    # everything before august 2022 is train 
-    df_train = df[df["date"] < pd.to_datetime("2023-08-01")]
-    df_test = df[df["date"] >= pd.to_datetime("2023-08-01")]
+    df_train = df[df["date"] < pd.to_datetime("2024-01-01")]
+    df_test = df[df["date"] >= pd.to_datetime("2024-01-01")]
 
 
     # 7) SAVE final train/test

@@ -156,7 +156,7 @@ print(fit, pars = c("team_strength", "home_adv", "c", "sigma_team", "beta"))
 posterior_samples <- rstan::extract(fit)
 
 # Traceplots for a few parameters
-traceplot(fit, pars = c("home_adv", "sigma_team", "team_strength[1]", "beta[1]"))
+traceplot(fit, pars = c("home_adv", "sigma_team", "team_strength[7]"))
 
 # Mean team strengths
 team_strength_means <- colMeans(posterior_samples$team_strength)
@@ -177,6 +177,23 @@ home_adv_mean <- mean(posterior_samples$home_adv)
 home_adv_ci <- quantile(posterior_samples$home_adv, probs = c(0.025, 0.975))
 cat("Home advantage mean:", home_adv_mean, 
     "95% CI:", home_adv_ci[1], "to", home_adv_ci[2], "\n")
+
+# Extract draws
+posterior_samples <- rstan::extract(fit)
+
+# Posterior distribution plot for home_adv
+df_home_adv <- data.frame(home_adv = posterior_samples$home_adv)
+ggplot(df_home_adv, aes(x = home_adv)) +
+  geom_histogram(bins = 50, alpha = 0.7) +
+  geom_vline(xintercept = mean(df_home_adv$home_adv), linetype = "dashed") +
+  labs(title = "Posterior Distribution of Home Advantage", x = "home_adv")
+
+# Posterior distribution of sigma_team
+df_sigma <- data.frame(sigma_team = posterior_samples$sigma_team)
+ggplot(df_sigma, aes(x = sigma_team)) +
+  geom_histogram(bins = 50, alpha = 0.7) +
+  geom_vline(xintercept = mean(df_sigma$sigma_team), linetype = "dashed") +
+  labs(title = "Posterior Distribution of sigma_team", x = "sigma_team")
 
 # -----------------------------------------------------------------------------
 # 5) OPTIONAL: TRAINING SET POSTERIOR PREDICTIVE CHECK
@@ -315,35 +332,34 @@ ggplot(conf_df_test, aes(x = Predicted, y = Actual, fill = Freq)) +
   theme_minimal()
 
 ###############################################################################
-# 7) ADD CREDIBLE INTERVALS & SAVE TEST RESULTS
+# 7) ADD CREDIBLE INTERVALS & CREATE RESULTS DATAFRAME
 ###############################################################################
-p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.025, 0.975))
-p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.025, 0.975))
-p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.025, 0.975))
+# reload the test data 
+test_data <- read.csv(test_file, stringsAsFactors = FALSE)
+p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.25, 0.75))
+p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.25, 0.75))
+p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.25, 0.75))
 
-test_data$prob_away_mean  <- mean_probs_test[, 1]
-test_data$prob_away_lower <- p1_quants[1, ]
-test_data$prob_away_upper <- p1_quants[2, ]
-
-test_data$prob_draw_mean  <- mean_probs_test[, 2]
-test_data$prob_draw_lower <- p2_quants[1, ]
-test_data$prob_draw_upper <- p2_quants[2, ]
-
-test_data$prob_home_mean  <- mean_probs_test[, 3]
-test_data$prob_home_lower <- p3_quants[1, ]
-test_data$prob_home_upper <- p3_quants[2, ]
-
-# Add predicted category & label
-test_data$predicted_category <- predicted_cat_test
-test_data$predicted_label <- factor(
-  test_data$predicted_category,
-  levels = c(1, 2, 3),
-  labels = c("Away Win", "Draw", "Home Win")
+results <- data.frame(
+  home_team = test_data$home_team,
+  away_team = test_data$away_team,
+  date = test_data$date,
+  matchreport = test_data$Match_report,
+  prob_away_mean  = mean_probs_test[, 1],
+  prob_away_lower = p1_quants[1, ],
+  prob_away_upper = p1_quants[2, ],
+  prob_draw_mean  = mean_probs_test[, 2],
+  prob_draw_lower = p2_quants[1, ],
+  prob_draw_upper = p2_quants[2, ],
+  prob_home_mean  = mean_probs_test[, 3],
+  prob_home_lower = p3_quants[1, ],
+  prob_home_upper = p3_quants[2, ],
+  predicted_category = predicted_cat_test,
+  predicted_label = factor(predicted_cat_test,
+                           levels = c(1, 2, 3),
+                           labels = c("Away Win", "Draw", "Home Win")),
+  true_category = true_cat_test
 )
 
-# Keep the true category if desired
-test_data$true_category <- true_cat_test
-
-# Write out
-write.csv(test_data, "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv", row.names = FALSE)
-cat("Saved 'test_data_with_predictions_home_adv.csv' with mean probabilities and 95% CIs.\n")
+write.csv(results, "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/results_bayes_base.csv", row.names = FALSE)
+cat("Saved 'results.csv' with mean probabilities and 50% credible intervals.\n")
