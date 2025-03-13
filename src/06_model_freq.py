@@ -50,10 +50,19 @@ def drop_old_incomplete_rows(df, date_col, frac_threshold=0.5):
     return df_clean
 
 def impute_missing_with_columnmean_up_until_that_date(df):
+    """
+    Impute missing numeric values using the cumulative mean computed from past data only.
+    For each numeric column, if a missing value is encountered, use the mean of all previous rows.
+    If no previous data is available (e.g. for the first row), impute with 0.
+    """
     df_imputed = df.copy()
     numeric_cols = df_imputed.select_dtypes(include=[np.number]).columns.tolist()
+    
     for col in numeric_cols:
+        # Compute the cumulative mean from previous rows only
         cum_mean = df_imputed[col].expanding(min_periods=1).mean().shift(1)
+        # For rows with no previous data, fill with 0
+        cum_mean = cum_mean.fillna(0)
         df_imputed[col] = df_imputed[col].fillna(cum_mean)
     return df_imputed
 
@@ -67,12 +76,11 @@ def load_data(csv_path):
       - Converts "date" to datetime and sorts by date.
       - Creates binary variable "home_win".
       - Maps "match_result" to a categorical variable "match_result_cat": -1 -> 0, 0 -> 1, 1 -> 2.
-      - Drops rows with missing match_result to avoid unmapped (NaN) outcomes.
+      - Drops rows with missing match_result.
     """
     df = pd.read_csv(csv_path)
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values('date').reset_index(drop=True)
-    # Drop rows where match_result is missing
     df = df.dropna(subset=["match_result"])
     df['home_win'] = (df['match_result'] == 1).astype(int)
     mapping = {-1: 0, 0: 1, 1: 2}
@@ -181,11 +189,11 @@ def main():
     df_train = load_data(train_csv_path)
     df_test = load_data(test_csv_path)
 
-    # Preprocess each dataset: drop rows with too many missing values and impute missing values
+    # Preprocess each dataset: drop rows with too many missing values and impute missing values safely
     df_train = drop_old_incomplete_rows(df_train, date_col="date", frac_threshold=0.5)
     df_test = drop_old_incomplete_rows(df_test, date_col="date", frac_threshold=0.5)
     
-    # Ensure dates are before today
+    # Ensure dates are before today (for training) and before a fixed date for testing
     df_train = df_train[df_train["date"] < pd.to_datetime("today")]
     df_test = df_test[df_test["date"] < pd.to_datetime("2025-02-15")]
     
@@ -218,7 +226,6 @@ def main():
     best_rf = tune_random_forest(X_train, y_train)
     print("evaluating model")
     y_pred_rf, y_proba_rf, acc_rf, ll_rf, f1_rf = evaluate_rf_model(best_rf, X_test, y_test)
-    print(y_proba_rf)
     
     # Save confusion matrix plot for Random Forest
     cm_rf = plot_and_save_confusion_matrix(y_test, y_pred_rf, 
@@ -236,9 +243,7 @@ def main():
     # Run Logistic Regression model
     pipe_logit, y_pred_logit, y_proba_logit, acc_logit, ll_logit, f1_logit = run_logistic_regression(X_train, y_train, X_test, y_test)
     
-    # -------------------------------------------------------------------------
-    # CREATE A SEPARATE DATAFRAME FOR PREDICTIONS (instead of saving in df_test)
-    # -------------------------------------------------------------------------
+    # Create a separate dataframe for predictions
     results_df = df_test[["Match_report", "away_team", "home_team", "date"]].copy()
     
     # Random Forest predictions
@@ -253,7 +258,6 @@ def main():
     results_df['logit_prediction_proba_draw'] = y_proba_logit[:,1]
     results_df['logit_prediction_proba_away_win'] = y_proba_logit[:,0]
     
-    # Save the new dataframe (instead of overwriting df_test)
     results_path = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data_predictions.csv"
     results_df.to_csv(results_path, index=False)
     print(f"Saved Random Forest and Logit predictions to {results_path}")

@@ -21,8 +21,6 @@ def compute_mean_stat_last_n_games(
     """
     home_output_col = f"home_mean_{stat_name}_last_{n}"
     away_output_col = f"away_mean_{stat_name}_last_{n}"
-    # Debug print to confirm newly created columns
-    # print(home_output_col, away_output_col)
 
     for row_number in range(len(df)):
         home_team = df.loc[row_number, home_team_col]
@@ -199,7 +197,7 @@ def implied_prob(df, home_odd, draw_odd, away_odd3):
     df[away_col] = 1/df[away_odd3]
     
     df[home_col] = df[home_col]/(df[home_col]+df[draw_col]+df[away_col])
-    df[away_col] = df[draw_col]/(df[home_col]+df[draw_col]+df[away_col])
+    df[draw_col] = df[draw_col]/(df[home_col]+df[draw_col]+df[away_col])
     df[away_col] = df[away_col]/(df[home_col]+df[draw_col]+df[away_col])
     return df
 
@@ -211,6 +209,85 @@ def give_integer_to_teams(df):
     team_dict = {team: i for i, team in enumerate(teams)}
     df['home_team_integer'] = df['home_team'].map(team_dict)
     df['away_team_integer'] = df['away_team'].map(team_dict)
+    return df
+
+def add_points_from_previous_season(df):
+    """
+    For each team and season_number, compute total points in that season.
+    Then, for each row (match), add how many points the home/away team
+    earned in the prior season. If a team did not exist (i.e., newly promoted),
+    they get 0 for previous season points.
+    
+    Requires:
+        - df['home_team'], df['away_team']
+        - df['match_result'] (1 = home win, 0 = draw, -1 = away win)
+        - df['season_number'] (integer)
+    """
+
+    # 1) Build an auxiliary dataframe with each team's total points per season
+    temp = df[['home_team', 'away_team', 'season_number', 'match_result']].copy()
+    
+    # Points for home side in each row
+    temp['points_home'] = np.where(
+        temp['match_result'] == 1, 3, 
+        np.where(temp['match_result'] == 0, 1,
+                 np.where(temp['match_result'] == -1, 0, np.nan))
+    )
+    # Points for away side in each row
+    temp['points_away'] = np.where(
+        temp['match_result'] == -1, 3,
+        np.where(temp['match_result'] == 0, 1,
+                 np.where(temp['match_result'] == 1, 0, np.nan))
+    )
+    
+    # Reshape: one "team" column
+    df_home = temp[['home_team', 'season_number', 'points_home']].rename(
+        columns={'home_team': 'team', 'points_home': 'points'}
+    )
+    df_away = temp[['away_team', 'season_number', 'points_away']].rename(
+        columns={'away_team': 'team', 'points_away': 'points'}
+    )
+    df_team_season = pd.concat([df_home, df_away], ignore_index=True)
+    
+    # Sum points by (team, season_number)
+    df_team_season_grouped = (
+        df_team_season
+        .groupby(['team','season_number'])['points']
+        .sum()
+        .reset_index()
+        .rename(columns={'points':'total_points'})
+    )
+    
+    # 2) Create a column referencing "next season" => shift points to next season
+    df_team_season_grouped['season_number_next'] = df_team_season_grouped['season_number'] + 1
+    
+    # Rename to clarify these are prior-season points
+    df_team_season_grouped.rename(columns={'total_points':'points_prev_season'}, inplace=True)
+    
+    # 3) Merge back for home teams
+    df = df.merge(
+        df_team_season_grouped[['team','season_number_next','points_prev_season']],
+        how='left',
+        left_on=['home_team','season_number'],
+        right_on=['team','season_number_next']
+    )
+    df.rename(columns={'points_prev_season':'home_points_prev_season'}, inplace=True)
+    df.drop(columns=['team','season_number_next'], inplace=True, errors='ignore')
+    
+    # 4) Merge back for away teams
+    df = df.merge(
+        df_team_season_grouped[['team','season_number_next','points_prev_season']],
+        how='left',
+        left_on=['away_team','season_number'],
+        right_on=['team','season_number_next']
+    )
+    df.rename(columns={'points_prev_season':'away_points_prev_season'}, inplace=True)
+    df.drop(columns=['team','season_number_next'], inplace=True, errors='ignore')
+    
+    # 5) If a team wasn't in the previous season, we fill that with 0
+    df['home_points_prev_season'] = df['home_points_prev_season'].fillna(0)
+    df['away_points_prev_season'] = df['away_points_prev_season'].fillna(0)
+
     return df
 
 ###############################################################################
@@ -226,9 +303,7 @@ def main():
     df = pd.read_csv(INPUT_PATH)
     n = 3
 
-    # 1) Rolling mean stats for each pair.
-    #    Examples of stats: xG, tackles, passes, progressive carries, possession, etc.
-    #    If you have other columns (shots_on_target, total_shots, etc.), add them here.
+    # 1) Rolling mean stats for each pair (xG, tackles, etc.).
     pairs = [
         ["home_xg", "away_xg", "xg"],
         ["Home_Tackles_Tkl", "Away_Tackles_Tkl", "Tackles_Tkl"],
@@ -238,8 +313,7 @@ def main():
         ["Home_Standard_Gls", "Away_Standard_Gls", "Standard_Gls"],
         ["Home_Expected_xG", "Away_Expected_xG", "Expected_xG"],
         ["Home_Expected.1_npxG", "Away_Expected.1_npxG", "Expected_npxG"],
-        # If your dataset has possession columns, for example:
-        # ["Home_Possession", "Away_Possession", "Possession"],
+        # Add more pairs if needed
     ]
     for home_col, away_col, name in pairs:
         df = compute_mean_stat_last_n_games(df, n, home_col, away_col, name)
@@ -249,9 +323,6 @@ def main():
     df = compute_pi_rating_online(df)
 
     # 2a) Create difference & ratio features from the rolling means
-    #     (these help model the relative matchup between teams)
-
-    # dynamic naming of the new rolling stats
     new_rolling_stats = [
         "mean_xg_last_3",
         "mean_Tackles_Tkl_last_3",
@@ -261,76 +332,62 @@ def main():
         "mean_Standard_Gls_last_3",
         "mean_Expected_xG_last_3",
         "mean_Expected_npxG_last_3",
-        # Add "mean_Possession_last_3" here if you included it above
     ]
-
     for stat_name in new_rolling_stats:
         home_col = f"home_{stat_name}"
         away_col = f"away_{stat_name}"
-        create_diff_and_ratio_features(df, home_col, away_col, stat_name)
+        df = create_diff_and_ratio_features(df, home_col, away_col, stat_name)
 
-    # Also, difference in Pi rating can help indicate relative team strength
+    # Also, difference in Pi rating
     df["diff_pi_rating"] = df["home_pi_rating"] - df["away_pi_rating"]
 
-
-    # 3) Drop columns not needed.
-    #    Many of your new features are stored as 'home_mean_...', 'away_mean_...', or
-    #    'diff_...', 'ratio_...'. The lines below remove original raw columns.
+    # 3) Drop columns not needed
     to_drop = [
-        # Original raw columns you no longer need:
-        'Home_Tackles_Tkl',
-        'Home_Touches.3_Mid 3rd',
-        'Home_Touches.4_Att 3rd',
-        'Home_Carries.2_PrgDist',
-        'Home_Standard_Gls',
-        'Home_Expected_xG',
-        'Home_Expected.1_npxG',
-        'Away_Tackles_Tkl',
-        'Away_Touches.3_Mid 3rd',
-        'Away_Touches.4_Att 3rd',
-        'Away_Carries.2_PrgDist',
-        'Away_Standard_Gls',
-        'Away_Expected_xG',
-        'Away_Expected.1_npxG',
-        'home_xg',
-        'away_xg',
-        'season',
-        'Home_Expected.3_G-xG',
-        'Away_Expected.3_G-xG','Away_Expected.2_npxG.Sh',
+        'Home_Tackles_Tkl', 'Home_Touches.3_Mid 3rd', 'Home_Touches.4_Att 3rd',
+        'Home_Carries.2_PrgDist', 'Home_Standard_Gls', 'Home_Expected_xG',
+        'Home_Expected.1_npxG', 'Away_Tackles_Tkl', 'Away_Touches.3_Mid 3rd',
+        'Away_Touches.4_Att 3rd', 'Away_Carries.2_PrgDist', 'Away_Standard_Gls',
+        'Away_Expected_xG', 'Away_Expected.1_npxG', 'home_xg', 'away_xg',
+        'season','Home_Expected.3_G-xG','Away_Expected.3_G-xG','Away_Expected.2_npxG.Sh',
         'attendance','Home_Total.3_TotDist', "Away_Tackles.1_TklW", "Home_Tackles.1_TklW",
         'Home_Tackles.2_Def 3rd', 'Away_Tackles.4_Att 3rd', 'Home_Expected.2_npxG/Sh',
-        'Home_xA_nan', 'Home_Expected.4_np:G-xG','Away_Total.3_TotDist','Away_xA_nan','Home_Total.4_PrgDist','Home_xAG_nan','away_win','Away_xAG_nan',
-        'Away_Tackles.2_Def 3rd','Home_Blocks.1_Sh','Home_Blocks.1_Sh','Away_Expected.4_np:G-xG','Away_Total.4_PrgDist', 'Home_Tackles.4_Att 3rd','Away_Blocks.1_Sh', 'Away_Expected.2_npxG/Sh',
-        # Potential columns with no further usage
-        # 'Home_Possession', 'Away_Possession',
-        # ... etc ...
+        'Home_xA_nan', 'Home_Expected.4_np:G-xG','Away_Total.3_TotDist','Away_xA_nan',
+        'Home_Total.4_PrgDist','Home_xAG_nan','away_win','Away_xAG_nan','Away_Tackles.2_Def 3rd',
+        'Home_Blocks.1_Sh','Away_Expected.4_np:G-xG','Away_Total.4_PrgDist','Home_Tackles.4_Att 3rd',
+        'Away_Blocks.1_Sh','Away_Expected.2_npxG/Sh'
     ]
-    odds_columns = ["B365H","B365D",	"B365A"	,"PSH"	,"PSD"	"PSA","WHH","WHD","WHA"]
 
+    # 3a) Add implied probabilities from odds
     df = implied_prob(df, "B365H", "B365D", "B365A")
     df = implied_prob(df, "PSH", "PSD", "PSA")
     df = implied_prob(df, "WHH", "WHD", "WHA")
-    #df.drop(columns=odds_columns, inplace=True, errors='ignore')
+    # You can drop the raw odds columns if you wish; for now, we keep them or drop as needed.
+
+    # 4) Give integer IDs to teams
     df = give_integer_to_teams(df)
+
+    # Drop not-needed columns
     df.drop(columns=to_drop, inplace=True, errors='ignore')
 
-    # 4) Prepare data & form
+    # 5) Add the "previous season points" feature
+    #    Make sure df['season_number'] is an integer that increments each season.
+    df = add_points_from_previous_season(df)
+
+    # 6) Prepare data & form features
     df = prepare_data(df)
     df = form_of_teams(df)
-    # 5) drop incomplete rows, date filter, and do time-aware imputations
+
+    # 7) drop incomplete rows, date filter, time-aware imputations
     df = drop_old_incomplete_rows(df, date_col="date", frac_threshold=0.5)
     df = df[df["date"] < pd.to_datetime("today")]
     df = df.sort_values('date').reset_index(drop=True)
     df = impute_missing_with_columnmean_up_until_that_date(df)
 
-    # 6) Time-based train/test split (90% / 10%)
-    n_total = len(df)
-    # split based on date
-    df_train = df[df["date"] < pd.to_datetime("2024-01-01")]
-    df_test = df[df["date"] >= pd.to_datetime("2024-01-01")]
+    # 8) Time-based train/test split (example: before/after 2024)
+    df_train = df[df["date"] < pd.to_datetime("2024-07-01")]
+    df_test = df[df["date"] >= pd.to_datetime("2024-07-01")]
 
-
-    # 7) SAVE final train/test
+    # 9) SAVE final train/test
     df_train.to_csv(TRAIN_OUTPUT_PATH, index=False)
     df_test.to_csv(TEST_OUTPUT_PATH, index=False)
 
