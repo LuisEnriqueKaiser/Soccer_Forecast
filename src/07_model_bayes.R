@@ -47,9 +47,9 @@ model {
   team_strength ~ normal(0, sigma_team);
 
   // Weakly informative prior for home-field advantage
-  home_adv ~ normal(0, 1);
+  home_adv ~ normal(0, 3);
 
-  c ~ normal(0, 5);
+  c ~ normal(0, 2);
   beta ~ normal(0, 5);
 
   // Likelihood: for each match, the latent score 
@@ -140,8 +140,8 @@ stan_model <- stan_model(model_code = stan_model_code)
 fit <- sampling(
   stan_model,
   data    = stan_data,
-  iter    = 6000,    # total iterations per chain
-  warmup  = 2000,    # burn-in
+  iter    = 4000,    # total iterations per chain
+  warmup  = 1000,    # burn-in
   chains  = 4,       
   seed    = 123,     
   control = list(adapt_delta = 0.95),
@@ -158,6 +158,8 @@ posterior_samples <- rstan::extract(fit)
 # Traceplots for a few parameters
 traceplot(fit, pars = c("home_adv", "sigma_team", "team_strength[7]"))
 
+
+# 
 # Mean team strengths
 team_strength_means <- colMeans(posterior_samples$team_strength)
 team_strength_df <- data.frame(
