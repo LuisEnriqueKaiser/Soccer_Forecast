@@ -43,14 +43,14 @@ parameters {
 }
 model {
   // Priors
-  sigma_team ~ normal(0, 5);
+  sigma_team ~ normal(0, 3);
   team_strength ~ normal(0, sigma_team);
 
   // Weakly informative prior for home-field advantage
   home_adv ~ normal(0, 3);
 
-  c ~ normal(0, 2);
-  beta ~ normal(0, 5);
+  c ~ normal(0, 4);
+  beta ~ normal(0, 3);
 
   // Likelihood: for each match, the latent score 
   //   (home team's strength + home_adv) - (away team's strength) + X*beta
@@ -135,67 +135,179 @@ stan_data <- list(
 # -----------------------------------------------------------------------------
 # 3) MODEL FITTING WITH STAN
 # -----------------------------------------------------------------------------
-stan_model <- stan_model(model_code = stan_model_code)
+# Define file paths
+output_dir <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/Bayes_base_results"
+fit_file <- file.path(output_dir, "stan_fit.rds")
 
-fit <- sampling(
-  stan_model,
-  data    = stan_data,
-  iter    = 4000,    # total iterations per chain
-  warmup  = 1000,    # burn-in
-  chains  = 4,       
-  seed    = 123,     
-  control = list(adapt_delta = 0.95),
-  refresh = 100
-)
+# Ask the user if they want to rerun MCMC or load saved model
+cat("Do you want to rerun the MCMC sampling? (yes/no): ")
+user_input <- tolower(readline())
 
+if (user_input == "yes") {
+  cat("Running MCMC sampling...\n")
+  
+  # Compile the Stan model
+  stan_model <- stan_model(model_code = stan_model_code)
+  
+  # Run the MCMC sampling
+  fit <- sampling(
+    stan_model,
+    data    = stan_data,
+    iter    = 5000,    # total iterations per chain
+    warmup  = 1000,     # burn-in
+    chains  = 4,       
+    seed    = 123,     
+    control = list(adapt_delta = 0.95),
+    refresh = 100
+  )
+  
+  # Save the fitted model
+  saveRDS(fit, fit_file)
+  cat("Stan model fit saved to:", fit_file, "\n")
+  
+} else {
+  # Load the saved model if the user chooses not to rerun MCMC
+  if (file.exists(fit_file)) {
+    cat("Loading saved Stan model fit...\n")
+    fit <- readRDS(fit_file)
+    cat("Stan model fit loaded successfully!\n")
+  } else {
+    stop("No saved Stan model fit found! You need to run MCMC at least once.")
+  }
+}
+
+# Print key parameter summaries
 print(fit, pars = c("team_strength", "home_adv", "c", "sigma_team", "beta"))
 
+output_dir <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/Bayes_base_results"
+fit_file <- file.path(output_dir, "stan_fit.rds")
+saveRDS(fit, fit_file)
+
+summary_fit <- summary(fit)$summary
+
+# Load necessary libraries
+library(stargazer)
+
+# Define output directory
+output_dir <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/Bayes_base_results"
+output_file <- file.path(output_dir, "Bayesian_Model_Results.tex")
+
+# Delete old file if it exists
+if (file.exists(output_file)) {
+  file.remove(output_file)
+}
+
+# Extract summary statistics from the Stan model fit
+summary_fit <- summary(fit)$summary
+
+# Select a subset of key parameters
+params_subset <- c("home_adv", "sigma_team", "c[1]", "c[2]", "beta[1]")  # Add more if needed
+subset_fit <- summary_fit[params_subset, ]
+
+# Restrict to desired columns: mean, se_mean, n_eff, Rhat
+subset_fit <- subset_fit[, c("mean", "se_mean", "n_eff", "Rhat")]
+
+# Convert row names (parameter names) into a column
+subset_fit <- data.frame(Parameter = rownames(subset_fit), subset_fit, row.names = NULL)
+colnames(subset_fit) <- c("Parameter", "Mean", "SE Mean", "Effective Sample Size (N_eff)", "Rhat")
+
+# Generate the LaTeX table correctly
+sink(output_file)  # Open output file
+
+stargazer(subset_fit, summary = FALSE, float = TRUE, align = TRUE,
+          title = "Summary MCMC Estimation",
+          label = "tab:mcmc_summary",
+          out = output_file)
+
+sink()  # Close output file
+
+cat("LaTeX table saved in:", output_file, "\n")
+
+
+# Bayesian Model Diagnostic Plots
+###############################################################################
+
+# Ensure directory exists
+if (!dir.exists(output_dir)) {
+  dir.create(output_dir, recursive = TRUE)
+}
+library(bayesplot)
+
 # -----------------------------------------------------------------------------
-# 4) POSTERIOR DIAGNOSTICS / TEAM STRENGTHS
+# Extract posterior samples
 # -----------------------------------------------------------------------------
 posterior_samples <- rstan::extract(fit)
 
-# Traceplots for a few parameters
-traceplot(fit, pars = c("home_adv", "sigma_team", "team_strength[7]"))
+# Define key parameters to include in the traceplot
+params_to_trace <- c("sigma_team", "c[1]", "c[2]", "beta[1]")  # Add more if needed
 
+# Extract MCMC samples from the fit object
+posterior_draws <- as.array(fit)  # Convert Stan output to array for bayesplot
+color_scheme_set("viridisB")  # Change this to experiment with different palettes
 
-# 
-# Mean team strengths
-team_strength_means <- colMeans(posterior_samples$team_strength)
-team_strength_df <- data.frame(
-  team = teams,
-  strength = team_strength_means
+# Create a combined traceplot
+trace_plot <- mcmc_trace(posterior_draws, pars = params_to_trace) +
+  theme_minimal()
+
+# Save as a high-resolution PNG file
+ggsave(filename = file.path(output_dir, "combined_traceplots.png"), 
+       plot = trace_plot, dpi = 300, width = 12, height = 8)
+
+# -----------------------------------------------------------------------------
+# 2) Posterior Distribution: Team Strength of a Specific Team
+# -----------------------------------------------------------------------------
+team_idx_to_plot <- 1  # Change this to plot another team
+
+df_team_strength <- data.frame(team_strength = posterior_samples$team_strength[, team_idx_to_plot])
+
+ggplot(df_team_strength, aes(x = team_strength)) +
+  geom_histogram(bins = 50, alpha = 0.7, fill = "darkgreen", color = "black") +
+  geom_vline(xintercept = mean(df_team_strength$team_strength), linetype = "dashed", color = "red") +
+  labs(title = paste("Posterior Distribution: Team Strength (Team Index", team_idx_to_plot, ")"),
+       x = "Team Strength", y = "Density") +
+  theme_minimal()
+
+# Save plot
+ggsave(filename = file.path(output_dir, paste0("posterior_team_strength_", team_idx_to_plot, ".png")),
+       dpi = 300, width = 8, height = 6)
+
+# -----------------------------------------------------------------------------
+# 3) Posterior Distribution: Cutpoints (c1, c2)
+# -----------------------------------------------------------------------------
+c1_samples <- posterior_samples$c[,1]  # Samples for c[1]
+c2_samples <- posterior_samples$c[,2]  # Samples for c[2]
+
+# Create a data frame for ggplot
+posterior_df <- data.frame(
+  Cutpoint = rep(c("c[1]", "c[2]"), each = length(c1_samples)),
+  Value = c(c1_samples, c2_samples)
 )
 
-# Quick visual
-ggplot(team_strength_df, aes(x = reorder(team, strength), y = strength)) +
-  geom_point() +
-  coord_flip() +
-  labs(x = "Team", y = "Estimated Strength", 
-       title = "Posterior Mean Estimates of Team Strengths (Home Advantage Mode)")
+# Plot overlapping histograms with transparency
+ggplot(posterior_df, aes(x = Value, fill = Cutpoint)) +
+  geom_histogram(alpha = 0.6, bins = 40, position = "identity") +
+  scale_fill_manual(values = c("blue", "red")) +  # Adjust colors as needed
+  labs(x = "Value",
+       y = "Density") +
+  theme_minimal()
 
-# Check the posterior for home_adv
-home_adv_mean <- mean(posterior_samples$home_adv)
-home_adv_ci <- quantile(posterior_samples$home_adv, probs = c(0.025, 0.975))
-cat("Home advantage mean:", home_adv_mean, 
-    "95% CI:", home_adv_ci[1], "to", home_adv_ci[2], "\n")
+ggsave(filename = file.path(output_dir, "posteriors.png"), dpi = 300, width = 8, height = 6)
 
-# Extract draws
-posterior_samples <- rstan::extract(fit)
+# -----------------------------------------------------------------------------
+# 4) Posterior Distribution: First Principal Component (PC1)
+# -----------------------------------------------------------------------------
+df_pc1 <- data.frame(PC1 = posterior_samples$beta[, 1])
 
-# Posterior distribution plot for home_adv
-df_home_adv <- data.frame(home_adv = posterior_samples$home_adv)
-ggplot(df_home_adv, aes(x = home_adv)) +
-  geom_histogram(bins = 50, alpha = 0.7) +
-  geom_vline(xintercept = mean(df_home_adv$home_adv), linetype = "dashed") +
-  labs(title = "Posterior Distribution of Home Advantage", x = "home_adv")
+ggplot(df_pc1, aes(x = PC1)) +
+  geom_histogram(bins = 50, alpha = 0.7, fill = "red", color = "black") +
+  geom_vline(xintercept = mean(df_pc1$PC1), linetype = "dashed", color = "red") +
+  labs(title = "Posterior Distribution: First Principal Component (PC1)",
+       x = "PC1", y = "Density") +
+  theme_minimal()
 
-# Posterior distribution of sigma_team
-df_sigma <- data.frame(sigma_team = posterior_samples$sigma_team)
-ggplot(df_sigma, aes(x = sigma_team)) +
-  geom_histogram(bins = 50, alpha = 0.7) +
-  geom_vline(xintercept = mean(df_sigma$sigma_team), linetype = "dashed") +
-  labs(title = "Posterior Distribution of sigma_team", x = "sigma_team")
+ggsave(filename = file.path(output_dir, "posterior_PC1.png"), dpi = 300, width = 8, height = 6)
+
+cat("Plots saved in:", output_dir, "\n")
 
 # -----------------------------------------------------------------------------
 # 5) OPTIONAL: TRAINING SET POSTERIOR PREDICTIVE CHECK
