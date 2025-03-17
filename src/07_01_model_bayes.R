@@ -50,7 +50,7 @@ model {
   home_adv ~ normal(0, 3);
 
   c ~ normal(0, 4);
-  beta ~ normal(0, 3);
+  beta ~ normal(0, 2);
 
   // Likelihood: for each match, the latent score 
   //   (home team's strength + home_adv) - (away team's strength) + X*beta
@@ -450,30 +450,31 @@ ggplot(conf_df_test, aes(x = Predicted, y = Actual, fill = Freq)) +
 ###############################################################################
 # reload the test data 
 test_data <- read.csv(test_file, stringsAsFactors = FALSE)
-p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.25, 0.75))
-p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.25, 0.75))
-p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.25, 0.75))
+# -- Change here: use 5% and 95% quantiles for a 90% credible interval --
+p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.05, 0.95))
+p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.05, 0.95))
+p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.05, 0.95))
 
 results <- data.frame(
   home_team = test_data$home_team,
   away_team = test_data$away_team,
   date = test_data$date,
-  matchreport = test_data$Match_report,
-  prob_away_mean  = mean_probs_test[, 1],
-  prob_away_lower = p1_quants[1, ],
-  prob_away_upper = p1_quants[2, ],
-  prob_draw_mean  = mean_probs_test[, 2],
-  prob_draw_lower = p2_quants[1, ],
-  prob_draw_upper = p2_quants[2, ],
-  prob_home_mean  = mean_probs_test[, 3],
-  prob_home_lower = p3_quants[1, ],
-  prob_home_upper = p3_quants[2, ],
-  predicted_category = predicted_cat_test,
-  predicted_label = factor(predicted_cat_test,
-                           levels = c(1, 2, 3),
-                           labels = c("Away Win", "Draw", "Home Win")),
+  Match_report = test_data$Match_report,
+  prob_away_mean_base_bayes  = mean_probs_test[, 1],
+  prob_away_lower_base_bayes = p1_quants[1, ],
+  prob_away_upper_base_bayes = p1_quants[2, ],
+  prob_draw_mean_base_bayes  = mean_probs_test[, 2],
+  prob_draw_lower_base_bayes = p2_quants[1, ],
+  prob_draw_upper_base_bayes = p2_quants[2, ],
+  prob_home_mean_base_bayes  = mean_probs_test[, 3],
+  prob_home_lower_base_bayes = p3_quants[1, ],
+  prob_home_upper_base_bayes = p3_quants[2, ],
+  predicted_category_base_bayes = predicted_cat_test,
+  predicted_label_base_bayes = factor(predicted_cat_test,
+                                      levels = c(1, 2, 3),
+                                      labels = c("Away Win", "Draw", "Home Win")),
   true_category = true_cat_test
 )
 
 write.csv(results, "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/results_bayes_base.csv", row.names = FALSE)
-cat("Saved 'results.csv' with mean probabilities and 50% credible intervals.\n")
+cat("Saved 'results.csv' with mean probabilities and 90% credible intervals.\n")

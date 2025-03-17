@@ -355,8 +355,6 @@ ggplot(team_strength_df, aes(x = reorder(team, strength), y = strength)) +
   labs(x = "Team", y = "Estimated Strength (Final Season)", 
        title = paste("Posterior Mean Estimates - Season", final_season_number))
 
-
-
 ###############################################################################
 # 6C) Example: Posterior Distribution for home_adv
 ###############################################################################
@@ -539,33 +537,34 @@ ggplot(conf_df_test, aes(x = Predicted, y = Actual, fill = Freq)) +
 ###############################################################################
 # 9) ADD CREDIBLE INTERVALS & CREATE RESULTS DATAFRAME
 ###############################################################################
-p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.25, 0.75))
-p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.25, 0.75))
-p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.25, 0.75))
+# Here we change the quantiles from 25% and 75% to 5% and 95% for a 90% credible interval.
+p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.025, 0.975))
+p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.05, 0.975))
+p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.05, 0.975))
 
 results <- data.frame(
   home_team = test_data$home_team,
   away_team = test_data$away_team,
   date = test_data$date,
-  matchreport = test_data$Match_report,
-  prob_away_mean  = mean_probs_test[, 1],
-  prob_away_lower = p1_quants[1, ],
-  prob_away_upper = p1_quants[2, ],
-  prob_draw_mean  = mean_probs_test[, 2],
-  prob_draw_lower = p2_quants[1, ],
-  prob_draw_upper = p2_quants[2, ],
-  prob_home_mean  = mean_probs_test[, 3],
-  prob_home_lower = p3_quants[1, ],
-  prob_home_upper = p3_quants[2, ],
-  predicted_category = predicted_cat_test,
-  predicted_label = factor(predicted_cat_test,
-                           levels = c(1, 2, 3),
-                           labels = c("Away Win", "Draw", "Home Win")),
+  Match_report = test_data$Match_report,
+  prob_away_mean_bayes_adv  = mean_probs_test[, 1],
+  prob_away_lower_bayes_adv = p1_quants[1, ],
+  prob_away_upper_bayes_adv = p1_quants[2, ],
+  prob_draw_mean_bayes_adv  = mean_probs_test[, 2],
+  prob_draw_lower_bayes_adv = p2_quants[1, ],
+  prob_draw_upper_bayes_adv = p2_quants[2, ],
+  prob_home_mean_bayes_adv  = mean_probs_test[, 3],
+  prob_home_lower_bayes_adv = p3_quants[1, ],
+  prob_home_upper_bayes_adv = p3_quants[2, ],
+  predicted_category_bayes_adv = predicted_cat_test,
+  predicted_label_bayes_adv = factor(predicted_cat_test,
+                                     levels = c(1, 2, 3),
+                                     labels = c("Away Win", "Draw", "Home Win")),
   true_category = true_cat_test
 )
 
 write.csv(results, "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/results_bayes_season.csv", row.names = FALSE)
-cat("Saved 'results_bayes_season.csv' with mean probabilities and 50% credible intervals.\n")
+cat("Saved 'results_bayes_season.csv' with mean probabilities and 90% credible intervals.\n")
 
 ###############################################################################
 # End of 07_02_season_based_prior_model_updated.R
