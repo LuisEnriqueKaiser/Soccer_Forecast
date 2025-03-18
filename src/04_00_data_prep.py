@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from project_specifics import MERGED_OUTPUT, CLEANED_MERGED
 
 def drop_old_incomplete_rows(df, date_col, frac_threshold=0.5):
     """
@@ -52,7 +53,7 @@ def assign_season(date):
 
 
 
-df = pd.read_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/processed/PL_merged_dataset.csv")
+df = pd.read_csv(MERGED_OUTPUT)
 df = drop_old_incomplete_rows(df, date_col="date", frac_threshold=0.5)
 
 # Apply the function to assign season
@@ -61,5 +62,5 @@ df['season'] = df['date'].apply(assign_season)
 df['season_number'] = df['season'].astype('category').cat.codes + 1
 
 # save the cleaned dataset
-df.to_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/processed/PL_merged_dataset_cleaned.csv", index=False)
+df.to_csv(CLEANED_MERGED, index=False)
 

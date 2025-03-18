@@ -133,8 +133,8 @@ def plot_accuracy_by_matchweek(df_test, y_true, y_pred, week_col='week'):
 # -------------------------------
 def tune_random_forest(X_train, y_train):
     param_grid = {
-        'n_estimators': [100, 200, 300],
-        'max_depth': [5, 10, 15],
+        'n_estimators': [100, 200, 300, 500, 1000],
+        'max_depth': [5, 10, 15, 20, 50, 100, 200],
         'min_samples_split': [2, 5, 10],
         'min_samples_leaf': [1, 2, 4]
     }

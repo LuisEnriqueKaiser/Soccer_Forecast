@@ -19,13 +19,14 @@ import pandas as pd
 import numpy as np
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from project_specifics import TRAIN_OUTPUT_PATH, TEST_OUTPUT_PATH
 
 def main():
     # File paths: adjust as needed
-    train_file = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv"
-    test_file  = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
-    output_train_file = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv"
-    output_test_file  = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
+    train_file = TRAIN_OUTPUT_PATH
+    test_file  = TEST_OUTPUT_PATH
+    output_train_file =TRAIN_OUTPUT_PATH
+    output_test_file  = TEST_OUTPUT_PATH
     
     # Load datasets
     df_train = pd.read_csv(train_file)

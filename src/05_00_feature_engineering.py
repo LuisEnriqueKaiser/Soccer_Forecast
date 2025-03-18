@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+from project_specifics import CLEANED_MERGED, TRAIN_OUTPUT_PATH, TEST_OUTPUT_PATH, pairs, to_drop
 
 ###############################################################################
 # Feature Engineering Functions
@@ -185,8 +186,6 @@ def implied_prob(df, home_odd, draw_odd, away_odd3):
     """
     Compute implied probabilities from odds. note that they have to add up to one 
     so i "clean" them in this way
-
-    dynamic naming based on the name of the odd
     """
     home_col = f"implied_prob_home_{home_odd}"
     draw_col = f"implied_prob_draw_{draw_odd}"
@@ -221,7 +220,7 @@ def add_points_from_previous_season(df):
     Requires:
         - df['home_team'], df['away_team']
         - df['match_result'] (1 = home win, 0 = draw, -1 = away win)
-        - df['season_number'] (integer)
+        - df['season_number'] (integer)  <--- This must exist first.
     """
 
     # 1) Build an auxiliary dataframe with each team's total points per season
@@ -295,26 +294,25 @@ def add_points_from_previous_season(df):
 ###############################################################################
 def main():
     # Paths (adjust as needed)
-    INPUT_PATH = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/processed/PL_merged_dataset_cleaned.csv"
-    TRAIN_OUTPUT_PATH = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv"
-    TEST_OUTPUT_PATH = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
+    INPUT_PATH = CLEANED_MERGED
 
     # Read data
     df = pd.read_csv(INPUT_PATH)
     n = 3
 
+    # (A) *** CREATE a 'season_number' column before add_points_from_previous_season ***
+    # If your entire dataset is one season, do e.g.:
+    # df['season_number'] = 2024
+    #
+    # or if you want to parse from date:
+    # WARNING: This is simplistic for leagues crossing new year in winter
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df['season_number'] = df['date'].dt.year  # e.g. 2023 => the 2023 "season"
+    # Adjust as needed, maybe something like:
+    # If date.month >= 8 => season_number = date.year + 1
+    # otherwise date.year
+
     # 1) Rolling mean stats for each pair (xG, tackles, etc.).
-    pairs = [
-        ["home_xg", "away_xg", "xg"],
-        ["Home_Tackles_Tkl", "Away_Tackles_Tkl", "Tackles_Tkl"],
-        ["Home_Touches.3_Mid 3rd", "Away_Touches.3_Mid 3rd", "Touches_Mid3rd"],
-        ["Home_Touches.4_Att 3rd", "Away_Touches.4_Att 3rd", "Touches_Att3rd"],
-        ["Home_Carries.2_PrgDist", "Away_Carries.2_PrgDist", "Carries_PrgDist"],
-        ["Home_Standard_Gls", "Away_Standard_Gls", "Standard_Gls"],
-        ["Home_Expected_xG", "Away_Expected_xG", "Expected_xG"],
-        ["Home_Expected.1_npxG", "Away_Expected.1_npxG", "Expected_npxG"],
-        # Add more pairs if needed
-    ]
     for home_col, away_col, name in pairs:
         df = compute_mean_stat_last_n_games(df, n, home_col, away_col, name)
 
@@ -341,53 +339,35 @@ def main():
     # Also, difference in Pi rating
     df["diff_pi_rating"] = df["home_pi_rating"] - df["away_pi_rating"]
 
-    # 3) Drop columns not needed
-    to_drop = [
-        'Home_Tackles_Tkl', 'Home_Touches.3_Mid 3rd', 'Home_Touches.4_Att 3rd',
-        'Home_Carries.2_PrgDist', 'Home_Standard_Gls', 'Home_Expected_xG',
-        'Home_Expected.1_npxG', 'Away_Tackles_Tkl', 'Away_Touches.3_Mid 3rd',
-        'Away_Touches.4_Att 3rd', 'Away_Carries.2_PrgDist', 'Away_Standard_Gls',
-        'Away_Expected_xG', 'Away_Expected.1_npxG', 'home_xg', 'away_xg',
-        'season','Home_Expected.3_G-xG','Away_Expected.3_G-xG','Away_Expected.2_npxG.Sh',
-        'attendance','Home_Total.3_TotDist', "Away_Tackles.1_TklW", "Home_Tackles.1_TklW",
-        'Home_Tackles.2_Def 3rd', 'Away_Tackles.4_Att 3rd', 'Home_Expected.2_npxG/Sh',
-        'Home_xA_nan', 'Home_Expected.4_np:G-xG','Away_Total.3_TotDist','Away_xA_nan',
-        'Home_Total.4_PrgDist','Home_xAG_nan','away_win','Away_xAG_nan','Away_Tackles.2_Def 3rd',
-        'Home_Blocks.1_Sh','Away_Expected.4_np:G-xG','Away_Total.4_PrgDist','Home_Tackles.4_Att 3rd',
-        'Away_Blocks.1_Sh','Away_Expected.2_npxG/Sh'
-    ]
-
-    # 3a) Add implied probabilities from odds
+    # 3) Add implied probabilities from odds
     df = implied_prob(df, "B365H", "B365D", "B365A")
     df = implied_prob(df, "PSH", "PSD", "PSA")
     df = implied_prob(df, "WHH", "WHD", "WHA")
-    # You can drop the raw odds columns if you wish; for now, we keep them or drop as needed.
 
     # 4) Give integer IDs to teams
     df = give_integer_to_teams(df)
 
-    # Drop not-needed columns
-    df.drop(columns=to_drop, inplace=True, errors='ignore')
-
-    # 5) Add the "previous season points" feature
-    #    Make sure df['season_number'] is an integer that increments each season.
+    # 5) Add previous season points
     df = add_points_from_previous_season(df)
 
-    # 6) Prepare data & form features
+    # 6) Drop columns not needed
+    df.drop(columns=to_drop, inplace=True, errors='ignore')
+
+    # 7) Prepare data & form features
     df = prepare_data(df)
     df = form_of_teams(df)
 
-    # 7) drop incomplete rows, date filter, time-aware imputations
+    # 8) drop incomplete rows, date filter, time-aware imputations
     df = drop_old_incomplete_rows(df, date_col="date", frac_threshold=0.5)
     df = df[df["date"] < pd.to_datetime("today")]
     df = df.sort_values('date').reset_index(drop=True)
     df = impute_missing_with_columnmean_up_until_that_date(df)
 
-    # 8) Time-based train/test split (example: before/after 2024)
+    # 9) Time-based train/test split (example: before/after 2024)
     df_train = df[df["date"] < pd.to_datetime("2024-07-01")]
     df_test = df[df["date"] >= pd.to_datetime("2024-07-01")]
 
-    # 9) SAVE final train/test
+    # 10) SAVE final train/test
     df_train.to_csv(TRAIN_OUTPUT_PATH, index=False)
     df_test.to_csv(TEST_OUTPUT_PATH, index=False)
 
