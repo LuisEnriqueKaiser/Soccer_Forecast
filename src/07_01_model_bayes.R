@@ -43,14 +43,14 @@ parameters {
 }
 model {
   // Priors
-  sigma_team ~ normal(0, 3);
+  sigma_team ~ normal(0, 5);
   team_strength ~ normal(0, sigma_team);
 
   // Weakly informative prior for home-field advantage
-  home_adv ~ normal(0, 3);
+  home_adv ~ normal(0, 4);
 
-  c ~ normal(0, 4);
-  beta ~ normal(0, 2);
+  c ~ normal(0, 5);
+  beta ~ normal(0, 3);
 
   // Likelihood: for each match, the latent score 
   //   (home team's strength + home_adv) - (away team's strength) + X*beta
@@ -81,18 +81,19 @@ data_raw <- read.csv(
 )
 
 # Convert match_result: -1=Away Win, 0=Draw, 1=Home Win --> 1,2,3 (for Stan)
-data_raw <- data_raw %>%
-  mutate(
-    match_result_cat = as.integer(
-      factor(match_result, levels = c(-1, 0, 1), labels = c(1, 2, 3))
-    )
-  )
+#data_raw <- data_raw %>%
+#  mutate(
+#    match_result_cat = as.integer(
+#      factor(match_result, levels = c(-1, 0, 1), labels = c(1, 2, 3))
+#    )
+#  )
 
 # Keep only relevant columns
 principal_component_names <- c("home_team", "away_team", "match_result_cat",
                                "PC1", "PC2", "PC3", "PC4", "PC5", 
                                "PC6", "PC7", "PC8", "PC9")
 data_raw <- data_raw[, (names(data_raw) %in% principal_component_names)]
+data_raw$away_points_prev_season
 
 # Team indices
 teams <- sort(unique(c(data_raw$home_team, data_raw$away_team)))
@@ -356,12 +357,12 @@ test_file <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/fi
 test_data <- read.csv(test_file, stringsAsFactors = FALSE)
 
 # Recode outcome if necessary
-test_data <- test_data %>%
-  mutate(
-    match_result_cat = as.integer(
-      factor(match_result, levels = c(-1, 0, 1), labels = c(1, 2, 3))
-    )
-  )
+#test_data <- test_data %>%
+#  mutate(
+#    match_result_cat = as.integer(
+#      factor(match_result, levels = c(-1, 0, 1), labels = c(1, 2, 3))
+#    )
+#  )
 
 # Must reuse the same teams for consistent indexing
 teams <- sort(unique(c(test_data$home_team, test_data$away_team)))
@@ -375,7 +376,7 @@ test_data <- test_data %>%
   )
 
 # Build test predictors
-predictor_cols <- c("PC1","PC2","PC3","PC4","PC5","PC6","PC7")
+predictor_cols <- c("PC1","PC2","PC3","PC4","PC5","PC6","PC7", "PC8", "PC9")
 X_test <- as.matrix(test_data[, predictor_cols])
 P_test <- ncol(X_test)
 
@@ -451,9 +452,9 @@ ggplot(conf_df_test, aes(x = Predicted, y = Actual, fill = Freq)) +
 # reload the test data 
 test_data <- read.csv(test_file, stringsAsFactors = FALSE)
 # -- Change here: use 5% and 95% quantiles for a 90% credible interval --
-p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.05, 0.95))
-p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.05, 0.95))
-p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.05, 0.95))
+p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.025, 0.975))
+p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.025, 0.975))
+p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.025, 0.975))
 
 results <- data.frame(
   home_team = test_data$home_team,

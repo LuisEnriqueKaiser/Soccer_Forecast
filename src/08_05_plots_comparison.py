@@ -4,13 +4,14 @@ import os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from project_specifics import RESULTS_FOLDER, OUTPUT_FOLDER
 
 def main():
     # -------------------------------------------------------------------------
     # 1. PATHS AND CONFIG
     # -------------------------------------------------------------------------
-    results_folder = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/"
-    output_folder  = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/comparison_models"
+    results_folder = RESULTS_FOLDER
+    output_folder  = OUTPUT_FOLDER
     os.makedirs(output_folder, exist_ok=True)
 
     # Use a built-in Matplotlib style; if you get an error, just remove or change it
@@ -30,7 +31,7 @@ def main():
     # -------------------------------------------------------------------------
     df1 = pd.read_csv(os.path.join(results_folder, 'results_bayes_base.csv'))
     df2 = pd.read_csv(os.path.join(results_folder, 'results_bayes_season.csv'))
-    df3 = pd.read_csv(os.path.join(results_folder, 'test_data_predictions.csv'))
+    df3 = pd.read_csv(os.path.join(results_folder, 'test_data_predictions_freq.csv'))
     df4 = pd.read_csv(os.path.join(results_folder, 'test_data.csv'))
 
     # -------------------------------------------------------------------------
@@ -38,6 +39,8 @@ def main():
     # -------------------------------------------------------------------------
     merged_df = pd.concat([df1, df2, df3, df4], axis=1, join='outer')
     merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
+    # take subset where the gameweek is smaller than 25
+    merged_df = merged_df[merged_df['week'] < 25]
     merged_df.reset_index(inplace=True)
 
     # -------------------------------------------------------------------------

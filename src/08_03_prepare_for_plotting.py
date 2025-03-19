@@ -381,8 +381,8 @@ def main():
     df = df.drop(columns=dropping, errors='ignore')
 
     # 9) Time-based train/test split (example: before/after 2024-07-01)
-    df_train = df[df["date"] < pd.to_datetime("2024-07-01")]
-    df_test = df[df["date"] >= pd.to_datetime("2024-07-01")]
+    df_train = df[df["date"] < pd.to_datetime("2024-10-01")]
+    df_test = df[df["date"] >= pd.to_datetime("2024-10-01")]
 
     # 10) SAVE final train/test
     df_train.to_csv(TRAIN_OUTPUT_PATH, index=False)
@@ -390,6 +390,7 @@ def main():
 
     print(f"Saved training data to {TRAIN_OUTPUT_PATH}")
     print(f"Saved test data to {TEST_OUTPUT_PATH}")
+    
 
 if __name__ == "__main__":
     main()

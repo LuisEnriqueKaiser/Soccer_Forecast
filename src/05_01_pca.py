@@ -61,7 +61,7 @@ def main():
     X_train_scaled = scaler.fit_transform(df_train[numeric_cols])
     
     # Fit PCA on training set (choose the number of components as desired)
-    n_components = 7
+    n_components = 9
     pca = PCA(n_components=n_components)
     X_train_pca = pca.fit_transform(X_train_scaled)
     

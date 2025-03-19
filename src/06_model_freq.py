@@ -22,6 +22,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import make_pipeline
 from joblib import parallel_backend
+from project_specifics import TABLES_DIR, FIGURES_DIR, TEST_OUTPUT_PATH, TRAIN_OUTPUT_PATH, RESULTS_FREQ
 
 # Check for the optional dependency 'jinja2'
 try:
@@ -29,9 +30,6 @@ try:
 except ImportError:
     raise ImportError("Missing optional dependency 'jinja2'. Please install it using 'pip install jinja2'.")
 
-# Define output directories for tables and figures.
-TABLES_DIR = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/tables"
-FIGURES_DIR = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/figures"
 
 os.makedirs(TABLES_DIR, exist_ok=True)
 os.makedirs(FIGURES_DIR, exist_ok=True)
@@ -75,16 +73,14 @@ def load_data(csv_path):
     Processing:
       - Converts "date" to datetime and sorts by date.
       - Creates binary variable "home_win".
-      - Maps "match_result" to a categorical variable "match_result_cat": -1 -> 0, 0 -> 1, 1 -> 2.
       - Drops rows with missing match_result.
     """
     df = pd.read_csv(csv_path)
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values('date').reset_index(drop=True)
-    df = df.dropna(subset=["match_result"])
-    df['home_win'] = (df['match_result'] == 1).astype(int)
-    mapping = {-1: 0, 0: 1, 1: 2}
-    df['match_result_cat'] = df['match_result'].map(mapping).astype('category')
+    # deletes games with missing match result catgeory
+    df = df.dropna(subset=["match_result_cat"])
+    df["match_result_cat"] = df["match_result_cat"].astype('category')
     return df
 
 # -------------------------------
@@ -183,8 +179,8 @@ def run_logistic_regression(X_train, y_train, X_test, y_test):
 # -------------------------------
 def main():
     # Use separate CSV files for training and testing
-    train_csv_path = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv"
-    test_csv_path  = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
+    train_csv_path = TRAIN_OUTPUT_PATH 
+    test_csv_path  =TEST_OUTPUT_PATH
 
     df_train = load_data(train_csv_path)
     df_test = load_data(test_csv_path)
@@ -258,7 +254,7 @@ def main():
     results_df['logit_prediction_proba_draw'] = y_proba_logit[:,1]
     results_df['logit_prediction_proba_away_win'] = y_proba_logit[:,0]
     
-    results_path = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data_predictions.csv"
+    results_path = RESULTS_FREQ
     results_df.to_csv(results_path, index=False)
     print(f"Saved Random Forest and Logit predictions to {results_path}")
     

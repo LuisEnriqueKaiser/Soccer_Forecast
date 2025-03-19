@@ -59,7 +59,7 @@ simulate_dynamic <- function(df,
                              bet_home_flag, bet_draw_flag, bet_away_flag, 
                              odds_home, odds_draw, odds_away,
                              result_col = "match_result_cat",
-                             initial_capital = 100, fraction = 0.1) {
+                             initial_capital = 100, fraction = 0.3) {
   
   capital <- initial_capital
   num_bets <- 0
