@@ -226,3 +226,17 @@ to_drop = [
 
 # script 05_01_pca.py
   # File paths: adjust as needed
+
+
+
+
+# script 06_00_model.py
+TABLES_DIR = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/tables"
+FIGURES_DIR = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/figures"
+RESULTS_FREQ = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data_predictions_freq.csv"
+
+
+
+# script 08 plots comparison 
+RESULTS_FOLDER = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/"
+OUTPUT_FOLDER  = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/comparison_models"
