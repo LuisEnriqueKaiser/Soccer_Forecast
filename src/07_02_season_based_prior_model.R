@@ -240,8 +240,8 @@ if (user_input == "yes") {
   fit <- sampling(
     stan_model,
     data    = stan_data,
-    iter    = 1000,
-    warmup  = 200,
+    iter    = 5000,
+    warmup  = 1000,
     chains  = 4,
     seed    = 123,
     control = list(adapt_delta = 0.95),
@@ -479,9 +479,9 @@ ggplot(conf_df_test, aes(x = Predicted, y = Actual, fill = Freq)) +
   theme_minimal()
 
 # 9) Add credible intervals & Save Results
-p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.4, 0.6))
-p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.4, 0.6))
-p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.4, 0.6))
+p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.025, 0.975))
+p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.025, 0.975))
+p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.025, 0.975))
 
 results <- data.frame(
   home_team_idx = test_data$home_team_idx,
@@ -506,7 +506,7 @@ results <- data.frame(
   true_category = true_cat_test
 )
 
-out_csv <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/results_bayes_season.csv"
+out_csv <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/results_bayes_season.csv"
 write.csv(results, out_csv, row.names = FALSE)
 cat("Saved results with mean probabilities and 95% CIs to:", out_csv, "\n")
 

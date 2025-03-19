@@ -40,7 +40,7 @@ def main():
     merged_df = pd.concat([df1, df2, df3, df4], axis=1, join='outer')
     merged_df = merged_df.loc[:, ~merged_df.columns.duplicated()]
     # take subset where the gameweek is smaller than 25
-    merged_df = merged_df[merged_df['week'] < 25]
+    #merged_df = merged_df[merged_df['week'] < 25]
     merged_df.reset_index(inplace=True)
 
     # -------------------------------------------------------------------------

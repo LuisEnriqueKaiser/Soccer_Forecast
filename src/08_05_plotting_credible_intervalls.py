@@ -113,7 +113,6 @@ def main():
     # Save and/or show
     out_file = os.path.join(OUTPUT_DIR, f"subset_{SUBSET_SIZE}_matches_probabilities.png")
     plt.savefig(out_file, dpi=300)
-    plt.show()
 
 
 if __name__ == "__main__":
