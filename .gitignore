@@ -1,5 +1,6 @@
 soccer_env/
-data/
+data/processed
+data/final
 src/sandbox.ipynb
 src/sandbox.py
 src/unifying.ipynb
