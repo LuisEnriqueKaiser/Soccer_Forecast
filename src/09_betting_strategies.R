@@ -66,7 +66,7 @@ if (length(missing_cols) > 0) {
 ###############################################################################
 # 4) Define bet flags for Bayesian & Random Forest
 ###############################################################################
-THRESHOLD_RF <- 0.2  # Adjust to tune how often the RF bets
+THRESHOLD_RF <- 0.25  # Adjust to tune how often the RF bets
 
 df <- df %>%
   mutate(

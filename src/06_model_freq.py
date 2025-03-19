@@ -191,7 +191,7 @@ def main():
     
     # Ensure dates are before today (for training) and before a fixed date for testing
     df_train = df_train[df_train["date"] < pd.to_datetime("today")]
-    df_test = df_test[df_test["date"] < pd.to_datetime("2025-02-15")]
+    df_test = df_test[df_test["date"] < pd.to_datetime("2025-03-09")]
     
     df_train = impute_missing_with_columnmean_up_until_that_date(df_train)
     df_test = impute_missing_with_columnmean_up_until_that_date(df_test)
