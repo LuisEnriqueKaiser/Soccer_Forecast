@@ -5,6 +5,7 @@ It also contains a simulation of betting strategies, showcasing the potential of
 
 Please note that at multiple places of the code one has to change up hardcoded paths. So prior to running after cloning the repo, one should ensure for each file that the right libraries are installed (see below) and that
 the paths are changed accordingly. 
+It is important for replication that one runs the codes in the order I numbered them as they are building on each other. 
 
 This repo also contains the basic data files of the initial download and the closing odds I simply downloaded from https://www.football-data.co.uk/, so that one might skip the first script 01_download_data.py
 
