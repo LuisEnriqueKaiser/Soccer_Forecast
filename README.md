@@ -3,7 +3,8 @@ This repository contains the replication files for my final term paper in the 2n
 My paper explores the advantages of using the Bayesian framework in order to improve on prediction accuracy, probability accuracy and uncertainty qunatification. 
 It also contains a simulation of betting strategies, showcasing the potential of this approach. 
 
-Please note that at multiple places of the code one has to change up hardcoded paths. So prior to running after cloning the repo, one should 
+Please note that at multiple places of the code one has to change up hardcoded paths. So prior to running after cloning the repo, one should ensure for each file that the right libraries are installed (see below) and that
+the paths are changed accordingly. 
 
 This repo also contains the basic data files of the initial download and the closing odds I simply downloaded from https://www.football-data.co.uk/, so that one might skip the first script 01_download_data.py
 
