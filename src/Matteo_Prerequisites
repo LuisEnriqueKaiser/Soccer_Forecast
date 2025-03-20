@@ -1,0 +1,37 @@
+
+
+I suspect that you do not want to run the whole code again, especially because large chunks are not directly related to the "bayesian" part of this paper. 
+
+For the bayesian parts, I also supply the relevant prepared datasets so that you can run only these parts locally. 
+The following things should be changed accordingly to your machine. It is basically just changing the paths at the right place. 
+
+The baseline bayesian model: 
+07_01_model_bayes.R: 
+1) data_raw <- read.csv(
+  "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv", 
+  stringsAsFactors = FALSE
+) --> Change to the right path
+2) output_dir <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/Bayes_base_results"
+--> Change to the right path (on multiple occasions in the code)
+3) test_file <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
+--> Change to the right path
+4) write.csv(results, "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/results_bayes_base.csv", row.names = FALSE)
+--> Change to the right path in the end
+
+
+The advanced bayesian model: 
+07_02_season_based_prior_model.R: 
+1) data_raw <- read.csv(
+  "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv", 
+  stringsAsFactors = FALSE
+) --> Change to the right path
+2) test_file <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
+--> Change to the right path
+3) output_dir <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/results/bayes_season_prior"
+--> Change to the right path (on multiple occasions in the code)
+
+4) out_csv <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/results_bayes_season.csv"
+--> Change to the right path in the end
+
+
+For the betting strategy code, you need to first run the other files. After that the paths also have to be changed accordingly. 
