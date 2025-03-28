@@ -79,7 +79,7 @@ def load_data(csv_path):
     df['date'] = pd.to_datetime(df['date'])
     df = df.sort_values('date').reset_index(drop=True)
     # deletes games with missing match result catgeory
-    df = df.dropna(subset=["match_result_cat"])
+    #df = df.dropna(subset=["match_result_cat"])
     df["match_result_cat"] = df["match_result_cat"].astype('category')
     return df
 
@@ -179,28 +179,30 @@ def run_logistic_regression(X_train, y_train, X_test, y_test):
 # -------------------------------
 def main():
     # Use separate CSV files for training and testing
-    train_csv_path = TRAIN_OUTPUT_PATH 
-    test_csv_path  =TEST_OUTPUT_PATH
+    train_csv_path = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/PCA_Train.csv" 
+    test_csv_path  ="/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/PCA_Test.csv"
 
     df_train = load_data(train_csv_path)
     df_test = load_data(test_csv_path)
-
+    print("Train data shape:", df_train.shape)
+    print("Test data shape:", df_test.shape)
     # Preprocess each dataset: drop rows with too many missing values and impute missing values safely
     df_train = drop_old_incomplete_rows(df_train, date_col="date", frac_threshold=0.5)
     df_test = drop_old_incomplete_rows(df_test, date_col="date", frac_threshold=0.5)
     
+    df_train["date"] = pd.to_datetime(df_train["date"], errors='coerce')
+    df_test["date"] = pd.to_datetime(df_test["date"], errors='coerce')
     # Ensure dates are before today (for training) and before a fixed date for testing
     df_train = df_train[df_train["date"] < pd.to_datetime("today")]
-    df_test = df_test[df_test["date"] < pd.to_datetime("2025-03-09")]
-    
+    df_test = df_test[df_test["date"] < pd.to_datetime("today") + pd.DateOffset(days=10)]
+
     df_train = impute_missing_with_columnmean_up_until_that_date(df_train)
     df_test = impute_missing_with_columnmean_up_until_that_date(df_test)
     
     # Define non-feature columns to exclude
     non_feature_cols = ["match_result", "match_result_cat", "home_win", "date", 
-                        "day", "score", "time", "Match_report", "notes", "away_win",
-                        "venue", "referee", "game_id", "home_team", "away_team",
-                        "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9"]
+                        "day", "score", "time", "match_report", "notes", "away_win",
+                        "venue", "referee", "game_id", "home_team", "away_team"]
 
     # Identify feature columns (ensure train and test have common features)
     feature_cols_train = [col for col in df_train.columns if col not in non_feature_cols]
@@ -210,6 +212,8 @@ def main():
     X_train = df_train[common_feature_cols].values
     X_test = df_test[common_feature_cols].values
     
+    print("Traiining columns" , X_train.shape)
+    print("Test columns" , X_test.shape)
     # Prepare target variable using the mapped category
     y_train = df_train["match_result_cat"].cat.codes.values
     y_test = df_test["match_result_cat"].cat.codes.values

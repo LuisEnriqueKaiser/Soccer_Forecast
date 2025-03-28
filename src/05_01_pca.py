@@ -34,19 +34,19 @@ def main():
     
     # Inspect the training data
     print("Training data shape:", df_train.shape)
-    print("Training data columns:", df_train.columns.tolist())
-    print("Training data (first 5 rows):")
-    print(df_train.head())
+    #print("Training data columns:", df_train.columns.tolist())
+    #print("Training data (first 5 rows):")
+    #print(df_train.head())
     
     # Define columns to exclude from PCA (these are typically identifiers or outcomes)
     exclude_cols = [
         'home_team', 'away_team', 'date', 'match_result', 'match_result_cat',
-        'home_win', 'away_win', 'score', 'home_win', 'away_win' ]
+        'home_win', 'away_win', 'score', 'home_win', 'away_win', "match_report" ]
     
     
     # Select numeric columns from training data that are not in the exclude list
     numeric_cols = [col for col in df_train.select_dtypes(include=[np.number]).columns if col not in exclude_cols]
-    print("Numeric columns for PCA:", numeric_cols)
+    #print("Numeric columns for PCA:", numeric_cols)
     
     # Check for leftover NaNs in training numeric columns
     num_nans = df_train[numeric_cols].isna().sum().sum()
@@ -61,7 +61,7 @@ def main():
     X_train_scaled = scaler.fit_transform(df_train[numeric_cols])
     
     # Fit PCA on training set (choose the number of components as desired)
-    n_components = 9
+    n_components = 40
     pca = PCA(n_components=n_components)
     X_train_pca = pca.fit_transform(X_train_scaled)
     
@@ -81,11 +81,18 @@ def main():
     # Option: Keep both the original numeric features and add the PCA columns
     df_train_final = pd.concat([df_train, df_train_pca], axis=1)
     df_test_final = pd.concat([df_test, df_test_pca], axis=1)
+    # drop everything except for the pca columns and the following list 
+    to_keep = [
+        "match_report",'home_team', 'away_team', 'date', 'match_result_cat',
+        "home_team_integer", "away_team_integer"]
+    df_train_final = df_train_final[to_keep + pc_cols]
+    df_test_final = df_test_final[to_keep + pc_cols]
     
     # Save the final datasets
-    df_train_final.to_csv(output_train_file, index=False)
-    df_test_final.to_csv(output_test_file, index=False)
+    df_train_final.to_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/PCA_Train.csv", index=False)
+    df_test_final.to_csv("/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/PCA_Test.csv", index=False)
     
+
     print(f"Saved training data with PCA components to: {output_train_file}")
     print(f"Saved test data with PCA components to: {output_test_file}")
 

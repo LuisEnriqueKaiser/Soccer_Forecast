@@ -5,44 +5,68 @@ from project_specifics import (
     PASSING_OUTPUT,
     POSSESSION_OUTPUT,
     SHOOTING_OUTPUT,
+    SHOT_CREATION_OUTPUT,
+    PASSING_TYPES_OUTPUT,
+    MISC_OUTPUT,
+    KEEPER_OUTPUT,
     MERGED_OUTPUT
 )
 
-def unify_to_one_line_per_match(df_stats: pd.DataFrame) -> pd.DataFrame:
-    """
-    Example of collapsing multiple lines per match into exactly one line.
-    Adjust as needed:
-      - If you see that each match_report has 2 lines (home/away), or partial lines
-        for sub-stats, group them by match_report and sum/mean, or pivot them.
-      - Return the collapsed DataFrame so that each match_report is unique.
-    """
-    # Example: if you can just group-and-sum numeric columns
-    #    (If your real data needs pivoting or more logic, do so here)
-    group_cols = [c for c in df_stats.columns if c != "Match_report"]
-    # Summarize or pivot. As a trivial example, sum numeric columns:
-    df_collapsed = df_stats.groupby("Match_report", as_index=False)[group_cols].sum()
-    return df_collapsed
 
 def merge_datasets():
-    # 1) Read schedule.  Rename match_report -> Match_report if needed
+    # Read the schedule dataframe
     schedule_df = pd.read_csv(SCHEDULE_OUTPUT)
-    schedule_df.rename(columns={"match_report": "Match_report"}, inplace=True)
+    # Ensure the merge column is named 'match_report' (uncomment if needed)
+    # schedule_df.rename(columns={'Match_report': 'match_report'}, inplace=True)
+    print("schedule_df shape:", schedule_df.shape)
 
-    # 2) Read & unify each stats DataFrame so it has exactly 1 row per match
-    defense_df    = unify_to_one_line_per_match(pd.read_csv(DEFENSE_OUTPUT))
-    passing_df    = unify_to_one_line_per_match(pd.read_csv(PASSING_OUTPUT))
-    possession_df = unify_to_one_line_per_match(pd.read_csv(POSSESSION_OUTPUT))
-    shots_df      = unify_to_one_line_per_match(pd.read_csv(SHOOTING_OUTPUT))
+    # Function to load and check stats dataframes
+    def load_and_check_stats(path, df_name):
+        df = pd.read_csv(path).set_index("match_report")
+        duplicates = df.index.duplicated().sum()
+        if duplicates > 0:
+            print(f"Warning: {df_name} has {duplicates} duplicate match_report entries. Aggregating or dropping duplicates.")
+            df = df[~df.index.duplicated(keep='first')]
+        print(f"{df_name} shape after processing:", df.shape)
+        return df
 
-    # 3) Merge everything onto the schedule by "Match_report"
-    #    use left or outer join depending on which matches you want to keep
-    merged_df = schedule_df.merge(defense_df, on="Match_report", how="left")
-    merged_df = merged_df.merge(passing_df, on="Match_report", how="left")
-    merged_df = merged_df.merge(possession_df, on="Match_report", how="left")
-    merged_df = merged_df.merge(shots_df, on="Match_report", how="left")
+    # Load each stats dataframe, check for duplicates, and set index
+    defense_df = load_and_check_stats(DEFENSE_OUTPUT, "defense_df")
+    passing_df = load_and_check_stats(PASSING_OUTPUT, "passing_df")
+    possession_df = load_and_check_stats(POSSESSION_OUTPUT, "possession_df")
+    shots_df = load_and_check_stats(SHOOTING_OUTPUT, "shots_df")
+    shot_creation_df = load_and_check_stats(SHOT_CREATION_OUTPUT, "shot_creation_df")
+    passing_types_df = load_and_check_stats(PASSING_TYPES_OUTPUT, "passing_types_df")
+    misc_df = load_and_check_stats(MISC_OUTPUT, "misc_df")
+    keeper_df = load_and_check_stats(KEEPER_OUTPUT, "keeper_df")
 
+    # Merge all stats dataframes onto the schedule dataframe
+    merged_df = schedule_df.copy()
+    stats_dfs = [
+        (defense_df, "defense"),
+        (passing_df, "passing"),
+        (possession_df, "possession"),
+        (shots_df, "shooting"),
+        (shot_creation_df, "shot_creation"),
+        (passing_types_df, "passing_types"),
+        (misc_df, "misc"),
+        (keeper_df, "keeper")
+    ]
+
+    for df, suffix in stats_dfs:
+        # Avoid column name conflicts by using suffixes
+        merged_df = merged_df.merge(
+            df,
+            left_on='match_report',
+            right_index=True,
+            how='left',
+            suffixes=('', f'_{suffix}')
+        )
+
+    # Save the merged dataframe
     merged_df.to_csv(MERGED_OUTPUT, index=False)
     print(f"Merged dataset saved to: {MERGED_OUTPUT}")
+    print("merged_df shape:", merged_df.shape)
 
 if __name__ == "__main__":
     merge_datasets()
