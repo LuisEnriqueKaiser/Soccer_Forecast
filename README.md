@@ -1,3 +1,4 @@
+NOTE: THIS REPO IS UPDATED CONSTANTLY. FOR EVALUATORS OF THE BAYESIAN MODELLING COURSE: PLEASE LOOK UP THE COMMIT OF AROUND THE 20th OF MARCH. 
 This repository contains the replication files for my final term paper in the 2nd-year PhD Bayesian Modeling course at Goethe University Frankfurt. 
 
 My paper explores the advantages of using the Bayesian framework in order to improve on prediction accuracy, probability accuracy and uncertainty qunatification. 
