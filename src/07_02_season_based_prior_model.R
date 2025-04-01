@@ -103,7 +103,7 @@ generated quantities {
 # 2) TRAINING DATA PREPARATION
 # -----------------------------------------------------------------------------
 data_raw <- read.csv(
-  "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/train_data.csv", 
+  "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/PCA_Train.csv", 
   stringsAsFactors = FALSE
 )
 
@@ -117,6 +117,13 @@ principal_component_names <- c(
   "match_result_cat",
   # PC columns
   "PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9",
+  "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16", "PC17", "PC18",
+  "PC19", "PC20", "PC21", "PC22", "PC23", "PC24", "PC25", "PC26", "PC27",
+  "PC28", "PC29", "PC30", "PC31", "PC32", "PC33", "PC34", "PC35", "PC36",
+  "PC37", "PC38", "PC39", "PC40", "PC41", "PC42", "PC43", "PC44", "PC45",
+  "PC46", "PC47", "PC48", "PC49", "PC50",
+  "PC51", "PC52", "PC53", "PC54", "PC55", "PC56", "PC57", "PC58", "PC59",
+  "PC60",
   # Points from previous season
   "home_points_prev_season",
   "away_points_prev_season"
@@ -131,7 +138,13 @@ data_raw$season_id     <- as.integer(data_raw$season_number)
 data_raw <- data_raw[ , names(data_raw) %in% principal_component_names]
 
 # We'll define the predictor columns *explicitly* as the PC columns only:
-predictor_cols <- c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9")
+predictor_cols <- c("PC1", "PC2", "PC3", "PC4", "PC5", "PC6", "PC7", "PC8", "PC9",
+                    "PC10", "PC11", "PC12", "PC13", "PC14", "PC15", "PC16", "PC17", "PC18",
+                    "PC19", "PC20", "PC21", "PC22", "PC23", "PC24", "PC25", "PC26", "PC27",
+                    "PC28", "PC29", "PC30", "PC31", "PC32", "PC33", "PC34", "PC35", "PC36",
+                    "PC37", "PC38", "PC39", "PC40", "PC41", "PC42", "PC43", "PC44", "PC45",
+                    "PC46", "PC47", "PC48", "PC49", "PC50", "PC51", "PC52", "PC53", "PC54",
+                    "PC55", "PC56", "PC57", "PC58", "PC59", "PC60")
 
 # Drop rows with missing predictor values
 data_raw <- data_raw[complete.cases(data_raw[, predictor_cols]), ]
@@ -139,7 +152,7 @@ data_raw <- data_raw[complete.cases(data_raw[, predictor_cols]), ]
 # -----------------------------------------------------------------------------
 # 3) TEST DATA & DETERMINE S, T
 # -----------------------------------------------------------------------------
-test_file <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/test_data.csv"
+test_file <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/PCA_Test.csv"
 test_data <- read.csv(test_file, stringsAsFactors = FALSE)
 test_data$season_id     <- as.integer(test_data$season_number)
 test_data$home_team_idx <- as.integer(test_data$home_team_integer)
@@ -180,6 +193,7 @@ df_perf_combined <- df_perf_combined %>%
   group_by(season_id, team_idx) %>%
   summarise(performance_value = mean(perf, na.rm = TRUE)) %>%
   ungroup()
+
 
 # Min–max scale to [-1, +1]
 minVal  <- min(df_perf_combined$performance_value, na.rm = TRUE)
@@ -240,7 +254,7 @@ if (user_input == "yes") {
   fit <- sampling(
     stan_model,
     data    = stan_data,
-    iter    = 5000,
+    iter    = 6000,
     warmup  = 1000,
     chains  = 4,
     seed    = 123,
@@ -260,7 +274,7 @@ if (user_input == "yes") {
   }
 }
 
-print(fit, pars = c("team_strength", "home_adv", "c", 
+print(fit, pars = c("home_adv", "c", 
                     "sigma_season", "sigma_team_init", "beta"))
 
 # -----------------------------------------------------------------------------
@@ -323,6 +337,7 @@ ggplot(df_strength_final, aes(x = reorder(team, strength), y = strength)) +
     y     = "Estimated Strength (Final Season)",
     title = paste("Posterior Mean Estimates - Season", final_season_idx)
   )
+
 
 # 6C) Posterior distribution for home_adv
 home_adv_samples <- posterior_samples$home_adv
@@ -452,59 +467,67 @@ for (s in seq_len(S_full)) {
 
 mean_probs_test    <- apply(post_probs_test, c(1,2), mean)
 predicted_cat_test <- apply(mean_probs_test, 1, which.max)
-true_cat_test      <- test_data$match_result_cat
+#true_cat_test      <- test_data$match_result_cat
 
-accuracy_test <- mean(predicted_cat_test == true_cat_test, na.rm = TRUE)
-cat("Out-of-sample (test) accuracy:", accuracy_test, "\n")
+#accuracy_test <- mean(predicted_cat_test == true_cat_test, na.rm = TRUE)
+#cat("Out-of-sample (test) accuracy:", accuracy_test, "\n")
 
-conf_matrix_test <- table(Actual = true_cat_test, Predicted = predicted_cat_test)
-cat("Out-of-sample (test) confusion matrix:\n")
-print(conf_matrix_test)
+#conf_matrix_test <- table(Actual = true_cat_test, Predicted = predicted_cat_test)
+#cat("Out-of-sample (test) confusion matrix:\n")
+#print(conf_matrix_test)
 
 
 # Optionally plot the confusion matrix
-conf_df_test <- as.data.frame(conf_matrix_test)
-colnames(conf_df_test) <- c("Actual", "Predicted", "Freq")
-conf_df_test$Actual    <- factor(conf_df_test$Actual,    levels = c(1,2,3),
-                                 labels = c("Away Win", "Draw", "Home Win"))
-conf_df_test$Predicted <- factor(conf_df_test$Predicted, levels = c(1,2,3),
-                                 labels = c("Away Win", "Draw", "Home Win"))
+#conf_df_test <- as.data.frame(conf_matrix_test)
+#colnames(conf_df_test) <- c("Actual", "Predicted", "Freq")
+#conf_df_test$Actual    <- factor(conf_df_test$Actual,    levels = c(1,2,3),
+                                 #labels = c("Away Win", "Draw", "Home Win"))
+#conf_df_test$Predicted <- factor(conf_df_test$Predicted, levels = c(1,2,3),
+                                 #labels = c("Away Win", "Draw", "Home Win"))
 
-ggplot(conf_df_test, aes(x = Predicted, y = Actual, fill = Freq)) +
-  geom_tile(color = "grey70") +
-  geom_text(aes(label = Freq), color = "black") +
-  scale_fill_gradient(low = "white", high = "blue") +
-  labs(x="Predicted Result", y="Actual Result",
-       title="Out-of-sample Confusion Matrix") +
-  theme_minimal()
+#ggplot(conf_df_test, aes(x = Predicted, y = Actual, fill = Freq)) +
+ # geom_tile(color = "grey70") +
+#  geom_text(aes(label = Freq), color = "black") +
+#  scale_fill_gradient(low = "white", high = "blue") +
+#  labs(x="Predicted Result", y="Actual Result",
+#       title="Out-of-sample Confusion Matrix") +
+#  theme_minimal()
 
 # 9) Add credible intervals & Save Results
-p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.025, 0.975))
-p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.025, 0.975))
-p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.025, 0.975))
+p1_quants <- apply(post_probs_test[, 1, ], 1, quantile, probs = c(0.2, 0.8))
+p2_quants <- apply(post_probs_test[, 2, ], 1, quantile, probs = c(0.2, 0.8))
+p3_quants <- apply(post_probs_test[, 3, ], 1, quantile, probs = c(0.2, 0.8))
+
+implied_odds <- 1 / mean_probs_test
+implied_odds_away_bounds <- 1 / p1_quants
+implied_odds_draw_bounds <- 1 / p2_quants
+implied_odds_home_bounds <- 1 / p3_quants
 
 results <- data.frame(
-  home_team_idx = test_data$home_team_idx,
-  away_team_idx = test_data$away_team_idx,
+  home_team = test_data$home_team,
+  away_team = test_data$away_team,
   date          = test_data$date,
-  Match_report  = test_data$Match_report,
-  prob_away_mean_bayes_adv  = mean_probs_test[, 1],
-  prob_away_lower_bayes_adv = p1_quants[1, ],
-  prob_away_upper_bayes_adv = p1_quants[2, ],
-  prob_draw_mean_bayes_adv  = mean_probs_test[, 2],
-  prob_draw_lower_bayes_adv = p2_quants[1, ],
-  prob_draw_upper_bayes_adv = p2_quants[2, ],
-  prob_home_mean_bayes_adv  = mean_probs_test[, 3],
-  prob_home_lower_bayes_adv = p3_quants[1, ],
-  prob_home_upper_bayes_adv = p3_quants[2, ],
-  predicted_category_bayes_adv = predicted_cat_test,
-  predicted_label_bayes_adv = factor(
-    predicted_cat_test, 
-    levels = c(1, 2, 3),
-    labels = c("Away Win", "Draw", "Home Win")
-  ),
-  true_category = true_cat_test
+  implied_odds_home = implied_odds[, 3],
+  implied_odds_away = implied_odds[, 1],
+  implied_odds_draw = implied_odds[, 2],
+
+  lower_bound_HOME = implied_odds_home_bounds[1, ],
+  lower_bound_DRAW = implied_odds_draw_bounds[1, ],
+  lower_bound_AWAY = implied_odds_away_bounds[1, ]
+
+  
+#  implied_odds_home_upper = implied_odds_home_bounds[2, ],
+#  implied_odds_away_upper = implied_odds_away_bounds[2, ],
+  
+#  implied_odds_draw_upper = implied_odds_draw_bounds[2, ],
+  
+#  predicted_label_bayes_adv = factor(
+#    predicted_cat_test, 
+#    levels = c(1, 2, 3),
+#    labels = c("Away Win", "Draw", "Home Win")
 )
+  
+
 
 out_csv <- "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/final/results_bayes_season.csv"
 write.csv(results, out_csv, row.names = FALSE)

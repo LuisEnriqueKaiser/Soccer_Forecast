@@ -41,7 +41,8 @@ def main():
     # Define columns to exclude from PCA (these are typically identifiers or outcomes)
     exclude_cols = [
         'home_team', 'away_team', 'date', 'match_result', 'match_result_cat',
-        'home_win', 'away_win', 'score', 'home_win', 'away_win', "match_report" ]
+        'home_win', 'away_win', 'score', 'home_win', 'away_win', "match_report", 
+        "home_points_previous_season", "away_points_previous_season" ]
     
     
     # Select numeric columns from training data that are not in the exclude list
@@ -61,7 +62,7 @@ def main():
     X_train_scaled = scaler.fit_transform(df_train[numeric_cols])
     
     # Fit PCA on training set (choose the number of components as desired)
-    n_components = 40
+    n_components = 60
     pca = PCA(n_components=n_components)
     X_train_pca = pca.fit_transform(X_train_scaled)
     
@@ -83,8 +84,8 @@ def main():
     df_test_final = pd.concat([df_test, df_test_pca], axis=1)
     # drop everything except for the pca columns and the following list 
     to_keep = [
-        "match_report",'home_team', 'away_team', 'date', 'match_result_cat',
-        "home_team_integer", "away_team_integer"]
+        "match_report",'home_team', 'away_team', 'date', 'match_result_cat', "season_number",
+        "home_team_integer", "away_team_integer", "home_points_prev_season", "away_points_prev_season",]
     df_train_final = df_train_final[to_keep + pc_cols]
     df_test_final = df_test_final[to_keep + pc_cols]
     

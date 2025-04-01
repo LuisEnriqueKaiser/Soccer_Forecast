@@ -339,7 +339,8 @@ def main():
     if "match_report" not in columns:
         raise ValueError("Match report not in columns")
     included_columns = [
-        "date", "home_team", "away_team", "score", "venue", "score", "match_report"]
+        "date", "home_team", "away_team", "score", "venue", "score", "match_report", "season_number", 
+        "home_points_prev_season", "away_points_prev_season", "home_team_integer", "away_team_integer",]
     not_included_columns = set(columns) - set(included_columns)
     print(f"Columns not included: {not_included_columns}")
     # 2) Drop columns not needed
@@ -387,7 +388,7 @@ def main():
         df["season_number"] = df["date"].apply(lambda x: x.year)
 
     # 5) Rolling means for each pair
-    n = 3
+    n = 5
     for home_col, away_col, name in pairs_new:
         print(f"Computing rolling mean for {name} ...")
         df = compute_mean_stat_last_n_games(
