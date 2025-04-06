@@ -25,8 +25,11 @@ def save_schedule_for_league(
     # If only_current is set, limit the seasons to the last one
     if only_current:
         seasons = [seasons[-1]]
-    
-    filename = f"{league}_schedule.csv".replace(" ", "_").lower()
+        name = "_schedule_updated"
+    # Create the filename based on league and seasons
+    else: 
+        name = "_schedule"
+    filename = f"{league}{name}.csv".replace(" ", "_").lower()
     full_path = os.path.join(filepath, filename)
     
     # Check if file exists and if current season is not active
@@ -92,6 +95,7 @@ def main():
     # Set this flag to True if the current season is in progress and you want to overwrite existing data.
     current_season_active = True
 
+    # if only_current is True, the f
     # Save schedule CSVs for each league
     for league in leagues:
         save_schedule_for_league(

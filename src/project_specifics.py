@@ -113,6 +113,55 @@ KEEPER_FILE = os.path.join(
     "eng-premier_league_keeper_2018-2019_2019-2020_2020-2021_2021-2022_2022-2023_2023-2024_2024-2025.csv"
 )
 
+# input directory for the update files 
+
+# Input file paths
+SHOOTING_FILE_UPDATE = os.path.join(
+    FBREF_DIR,
+    "eng-premier_league_shooting_2024-2025.csv"
+)
+PASSING_FILE_UPDATE = os.path.join(
+    FBREF_DIR,
+    "eng-premier_league_passing_2024-2025.csv"
+)
+POSSESSION_FILE_UPDATE = os.path.join(
+    FBREF_DIR,
+    "eng-premier_league_possession_2024-2025.csv"
+)
+DEFENSE_FILE_UPDATE = os.path.join(
+    FBREF_DIR,
+    "eng-premier_league_defense_2024-2025.csv"
+)
+SCHEDULE_FILE_UPDATE = os.path.join(FBREF_DIR, "eng-premier_league_schedule_updated.csv")
+
+SHOT_CREATION_FILE_UPDATE = os.path.join(
+    FBREF_DIR,
+    "eng-premier_league_goal_shot_creation_2024-2025.csv"
+)
+PASSING_TYPES_FILE_UPDATE = os.path.join(
+    FBREF_DIR,
+    "eng-premier_league_passing_types_2024-2025.csv"
+)
+MISC_FILE_UPDATE = os.path.join(
+    FBREF_DIR,
+    "eng-premier_league_misc_2024-2025.csv"
+)
+
+KEEPER_FILE_UPDATE = os.path.join(
+    FBREF_DIR,
+    "eng-premier_league_keeper_2024-2025.csv"
+)
+
+
+
+
+
+
+
+
+
+
+
 # Output file paths
 SHOOTING_OUTPUT = os.path.join(PROCESSED_DIR, "PL_processes_shots.csv")
 SHOT_CREATION_OUTPUT = os.path.join(PROCESSED_DIR, "PL_processes_shot_creation.csv")
@@ -123,6 +172,18 @@ DEFENSE_OUTPUT = os.path.join(PROCESSED_DIR, "PL_processes_defense.csv")
 SCHEDULE_OUTPUT = os.path.join(PROCESSED_DIR, "PL_processed_schedule.csv")
 MISC_OUTPUT = os.path.join(PROCESSED_DIR, "PL_processes_misc.csv")
 KEEPER_OUTPUT = os.path.join(PROCESSED_DIR, "PL_processes_keeper.csv")
+
+# Output file paths for the update files
+SHOOTING_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processes_shots_update.csv")
+SHOT_CREATION_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processes_shot_creation_update.csv")
+PASSING_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processes_passing_update.csv")
+PASSING_TYPES_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processes_passing_types_update.csv")
+POSSESSION_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processes_possession_update.csv")
+DEFENSE_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processes_defense_update.csv")
+SCHEDULE_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processed_schedule_update.csv")
+MISC_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processes_misc_update.csv")
+KEEPER_OUTPUT_UPDATE = os.path.join(PROCESSED_DIR, "PL_processes_keeper_update.csv")
+
 
 # Column renaming: these keys (as produced by transform) are renamed for consistency.
 COLUMN_RENAME = {

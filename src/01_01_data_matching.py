@@ -229,4 +229,59 @@ if __name__ == "__main__":
         input_file=config.KEEPER_FILE,
         output_file=config.KEEPER_OUTPUT
     )
+
+    # do the same things for the updated data
+    process_and_save(
+        input_file=config.SHOOTING_FILE_UPDATE,
+        output_file=config.SHOOTING_OUTPUT_UPDATE
+    )
+
+    process_and_save(
+        input_file=config.PASSING_FILE_UPDATE,
+        output_file=config.PASSING_OUTPUT_UPDATE
+    )
+
+    process_and_save(
+        input_file=config.POSSESSION_FILE_UPDATE,
+        output_file=config.POSSESSION_OUTPUT_UPDATE
+    )
+
+    process_and_save(
+        input_file=config.DEFENSE_FILE_UPDATE,
+        output_file=config.DEFENSE_OUTPUT_UPDATE
+    )
+
+    process_and_save(
+        input_file=config.SCHEDULE_FILE_UPDATE,
+        output_file=config.SCHEDULE_OUTPUT_UPDATE
+    )
+
+    process_and_save(
+        input_file=config.SHOT_CREATION_FILE_UPDATE,
+        output_file=config.SHOT_CREATION_OUTPUT_UPDATE
+    )
+
+    process_and_save(
+        input_file=config.PASSING_TYPES_FILE_UPDATE,
+        output_file=config.PASSING_TYPES_OUTPUT_UPDATE
+    )
+
+    process_and_save(
+        input_file=config.MISC_FILE_UPDATE,
+        output_file=config.MISC_OUTPUT_UPDATE
+    )
+
+    process_and_save(
+        input_file=config.KEEPER_FILE_UPDATE,
+        output_file=config.KEEPER_OUTPUT_UPDATE
+    )
+    # Process the updated schedule data
+    process_and_save(
+        input_file=config.SCHEDULE_FILE_UPDATE,
+        output_file=config.SCHEDULE_OUTPUT_UPDATE
+    )
+    
+
+
+
     print("Done with all datasets.")
