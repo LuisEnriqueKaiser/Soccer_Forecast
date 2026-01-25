@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
 import pandas as pd
 import streamlit as st
@@ -18,7 +17,6 @@ def initialize_log() -> None:
     if not LOG_PATH.exists():
         pd.DataFrame(
             columns=[
-                "request_id",
                 "timestamp_utc",
                 "match",
                 "market",
@@ -77,11 +75,9 @@ def append_log(
     polymarket_odds: float,
     tax_rate: float,
     results: pd.DataFrame,
-    request_id: str,
 ) -> None:
     timestamp = datetime.now(timezone.utc).isoformat()
     log_rows = results.assign(
-        request_id=request_id,
         timestamp_utc=timestamp,
         match=match,
         market=market,
@@ -89,7 +85,6 @@ def append_log(
         tax_rate=tax_rate,
     )
     ordered = [
-        "request_id",
         "timestamp_utc",
         "match",
         "market",
@@ -162,18 +157,11 @@ def main() -> None:
             bookmaker_entries.append({"name": name, "odds": odds})
 
     if st.button("Analyze and save"):
-        if not match.strip():
-            st.warning("Please enter a match name.")
-            st.stop()
-        if not market.strip():
-            st.warning("Please enter a market name.")
-            st.stop()
         results = calculate_value_edges(polymarket_odds, tax_rate, bookmaker_entries)
         if results.empty:
             st.warning("Add at least one bookmaker.")
         else:
-            request_id = uuid4().hex[:8]
-            append_log(match, market, polymarket_odds, tax_rate, results, request_id)
+            append_log(match, market, polymarket_odds, tax_rate, results)
             st.success("Analysis saved to data/bet_requests.csv")
             st.subheader("Mispriced Odds Results")
             st.dataframe(
@@ -206,23 +194,7 @@ def main() -> None:
     if history.empty:
         st.caption("No saved bets yet.")
     else:
-        history = history.sort_values("timestamp_utc", ascending=False)
-        request_ids = history["request_id"].unique().tolist()
-        selected_request = st.selectbox(
-            "View a saved request",
-            options=request_ids,
-            format_func=lambda value: f"Request {value}",
-        )
-        st.dataframe(
-            history[history["request_id"] == selected_request],
-            use_container_width=True,
-        )
-        st.download_button(
-            "Download bet history CSV",
-            data=history.to_csv(index=False),
-            file_name="bet_requests.csv",
-            mime="text/csv",
-        )
+        st.dataframe(history, use_container_width=True)
 
 
 if __name__ == "__main__":

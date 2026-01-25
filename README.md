@@ -62,6 +62,6 @@ This repo now includes a lightweight Streamlit app for comparing Polymarket odds
    streamlit run streamlit_app.py
    ```
 
-The app stores results in `data/bet_requests.csv` so you can revisit prior bets and download the full history.
+The app stores results in `data/bet_requests.csv` so you can revisit prior bets.
 
 
