@@ -47,4 +47,21 @@ This repo also contains the basic data files of the initial download and the clo
 R libraries: rstan, dplyr, ggplot2, stargazer, bayesplot
 Python libraries: os, soccerdata, pandas, numpy, skicit-learn, joblib, matplotlib
 
+## Odds Mispricing Streamlit App
+
+This repo now includes a lightweight Streamlit app for comparing Polymarket odds to up to 10 bookmaker lines and logging the results locally.
+
+### Run locally
+
+1. Install dependencies (including Streamlit):
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. Start the app:
+   ```bash
+   streamlit run streamlit_app.py
+   ```
+
+The app stores results in `data/bet_requests.csv` so you can revisit prior bets.
+
 
