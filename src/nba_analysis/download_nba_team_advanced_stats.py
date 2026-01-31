@@ -6,6 +6,8 @@ from typing import Iterable
 
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DEFAULT_OUT_DIR = os.path.join(BASE_DIR, "data", "nba", "processed")
@@ -24,6 +26,8 @@ NBA_HEADERS = {
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     ),
+    "x-nba-stats-origin": "stats",
+    "x-nba-stats-token": "true",
 }
 
 
@@ -31,9 +35,34 @@ def _ensure_dir(path: str) -> None:
     os.makedirs(path, exist_ok=True)
 
 
-def _nba_get(endpoint: str, params: dict, sleep_s: float = 0.6) -> dict:
+def _build_session(max_retries: int, backoff: float) -> requests.Session:
+    retry = Retry(
+        total=max_retries,
+        connect=max_retries,
+        read=max_retries,
+        status=max_retries,
+        backoff_factor=backoff,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["GET"],
+        raise_on_status=False,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session = requests.Session()
+    session.headers.update(NBA_HEADERS)
+    session.mount("https://", adapter)
+    session.mount("http://", adapter)
+    return session
+
+
+def _nba_get(
+    session: requests.Session,
+    endpoint: str,
+    params: dict,
+    sleep_s: float = 0.6,
+    timeout_s: int = 30,
+) -> dict:
     url = f"{NBA_STATS_BASE}/{endpoint}"
-    resp = requests.get(url, params=params, headers=NBA_HEADERS, timeout=30)
+    resp = session.get(url, params=params, timeout=timeout_s)
     resp.raise_for_status()
     time.sleep(sleep_s)
     return resp.json()
@@ -46,7 +75,13 @@ def _resultset_to_df(payload: dict, resultset_name: str) -> pd.DataFrame:
     raise KeyError(f"resultSet '{resultset_name}' not found")
 
 
-def _fetch_league_team_gamelog(season: str, season_type: str, sleep_s: float) -> pd.DataFrame:
+def _fetch_league_team_gamelog(
+    session: requests.Session,
+    season: str,
+    season_type: str,
+    sleep_s: float,
+    timeout_s: int,
+) -> pd.DataFrame:
     params = {
         "LeagueID": "00",
         "PlayerOrTeam": "T",
@@ -55,7 +90,7 @@ def _fetch_league_team_gamelog(season: str, season_type: str, sleep_s: float) ->
         "Sorter": "DATE",
         "Direction": "ASC",
     }
-    payload = _nba_get("leaguegamelog", params, sleep_s=sleep_s)
+    payload = _nba_get(session, "leaguegamelog", params, sleep_s=sleep_s, timeout_s=timeout_s)
     df = _resultset_to_df(payload, "LeagueGameLog")
     if df.empty:
         return df
@@ -75,7 +110,12 @@ def _fetch_league_team_gamelog(season: str, season_type: str, sleep_s: float) ->
     return df
 
 
-def _fetch_boxscore_advanced(game_id: str, sleep_s: float) -> pd.DataFrame:
+def _fetch_boxscore_advanced(
+    session: requests.Session,
+    game_id: str,
+    sleep_s: float,
+    timeout_s: int,
+) -> pd.DataFrame:
     params = {
         "GameID": game_id,
         "StartPeriod": 0,
@@ -84,7 +124,7 @@ def _fetch_boxscore_advanced(game_id: str, sleep_s: float) -> pd.DataFrame:
         "EndRange": 28800,
         "RangeType": 0,
     }
-    payload = _nba_get("boxscoreadvancedv2", params, sleep_s=sleep_s)
+    payload = _nba_get(session, "boxscoreadvancedv2", params, sleep_s=sleep_s, timeout_s=timeout_s)
     df = _resultset_to_df(payload, "TeamStats")
     if df.empty:
         return df
@@ -154,13 +194,29 @@ def _clean_team_advanced(df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
+def _load_existing_dataset(out_path: str) -> pd.DataFrame:
+    if not os.path.exists(out_path):
+        return pd.DataFrame()
+    try:
+        return pd.read_csv(out_path, low_memory=False)
+    except Exception:
+        return pd.DataFrame()
+
+
 def build_team_advanced_dataset(
     season: str,
     season_type: str = "Regular Season",
     sleep_s: float = 0.6,
     raw_dir: str | None = None,
+    max_retries: int = 5,
+    backoff: float = 0.7,
+    timeout_s: int = 30,
+    existing_df: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    game_log = _fetch_league_team_gamelog(season, season_type, sleep_s)
+    session = _build_session(max_retries=max_retries, backoff=backoff)
+    game_log = _fetch_league_team_gamelog(
+        session, season, season_type, sleep_s, timeout_s
+    )
     if game_log.empty:
         return game_log
 
@@ -170,10 +226,17 @@ def build_team_advanced_dataset(
         game_log.to_csv(raw_path, index=False)
 
     unique_game_ids = sorted(game_log["game_id"].unique())
+    existing_game_ids: set[str] = set()
+    if existing_df is not None and not existing_df.empty:
+        col = "game_id" if "game_id" in existing_df.columns else None
+        if col:
+            existing_game_ids = set(existing_df[col].astype(str).unique())
     advanced_rows = []
 
     for idx, game_id in enumerate(unique_game_ids, start=1):
-        df_game = _fetch_boxscore_advanced(game_id, sleep_s)
+        if str(game_id) in existing_game_ids:
+            continue
+        df_game = _fetch_boxscore_advanced(session, game_id, sleep_s, timeout_s)
         if df_game is None or df_game.empty:
             continue
         advanced_rows.append(df_game)
@@ -218,20 +281,42 @@ def save_team_advanced_dataset(
     sleep_s: float = 0.6,
     overwrite: bool = False,
     raw_dir: str | None = None,
+    max_retries: int = 5,
+    backoff: float = 0.7,
+    timeout_s: int = 30,
+    incremental: bool = False,
 ) -> str:
     _ensure_dir(out_dir)
     safe_season_type = season_type.lower().replace(" ", "_")
     out_path = os.path.join(out_dir, f"nba_team_advanced_{season}_{safe_season_type}.csv")
 
+    existing_df = pd.DataFrame()
     if os.path.exists(out_path) and not overwrite:
-        print(f"[SKIP] {out_path} already exists (overwrite=False).")
-        return out_path
+        if incremental:
+            existing_df = _load_existing_dataset(out_path)
+            print(f"[INFO] Incremental update using {len(existing_df)} existing rows.")
+        else:
+            print(f"[SKIP] {out_path} already exists (overwrite=False).")
+            return out_path
 
     df = build_team_advanced_dataset(
-        season, season_type, sleep_s=sleep_s, raw_dir=raw_dir
+        season,
+        season_type,
+        sleep_s=sleep_s,
+        raw_dir=raw_dir,
+        max_retries=max_retries,
+        backoff=backoff,
+        timeout_s=timeout_s,
+        existing_df=existing_df if incremental else None,
     )
-    if df.empty:
+    if df.empty and not incremental:
         raise RuntimeError("No data returned from NBA stats API.")
+
+    if incremental and not existing_df.empty:
+        if not df.empty:
+            df = pd.concat([existing_df, df], ignore_index=True)
+        else:
+            df = existing_df
 
     df.to_csv(out_path, index=False)
     print(f"[OK] Saved {len(df)} rows -> {out_path}")
@@ -284,9 +369,32 @@ def parse_args() -> argparse.Namespace:
         help="Seconds to sleep between NBA stats API requests",
     )
     parser.add_argument(
+        "--max-retries",
+        type=int,
+        default=5,
+        help="Max retries for NBA stats API requests",
+    )
+    parser.add_argument(
+        "--backoff",
+        type=float,
+        default=0.7,
+        help="Backoff factor for retries",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=30,
+        help="Request timeout in seconds",
+    )
+    parser.add_argument(
         "--overwrite",
         action="store_true",
         help="Overwrite existing output file",
+    )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Iteratively update existing CSVs by fetching only missing games",
     )
     parser.add_argument(
         "--save-raw",
@@ -315,11 +423,15 @@ def main() -> None:
         out_path = save_team_advanced_dataset(
             season=season,
             season_type=args.season_type,
-            out_dir=args.out_dir,
-            sleep_s=args.sleep,
-            overwrite=args.overwrite,
-            raw_dir=raw_dir,
-        )
+        out_dir=args.out_dir,
+        sleep_s=args.sleep,
+        overwrite=args.overwrite,
+        raw_dir=raw_dir,
+        max_retries=args.max_retries,
+        backoff=args.backoff,
+        timeout_s=args.timeout,
+        incremental=args.incremental,
+    )
         out_paths.append(out_path)
 
     meta = {
