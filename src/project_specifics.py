@@ -1,5 +1,5 @@
 '''
-this file serves as an overview of all projectwide variables and constants which can be changed by the zser to adapt the project to their needs
+    this file serves as an overview of all projectwide variables and constants which can be changed by the zser to adapt the project to their needs
 '''
 import os
 
@@ -8,6 +8,48 @@ import os
 # script 00_odds_data_built.py
 filepath_00 = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/odds/"
 output_path_00 = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/processed/merged_odds.csv"
+filepath_data = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/"
+fbref = "fbref"
+addition_path = "processed"
+oods = "odds"
+
+france =  "Uber"
+spain = "PD"
+germany = "BL"
+italy = "SA"
+england = "PL"
+
+relevant_odds = [
+    "B365H", "B365D", "B365A",
+    "BWH", "BWD", "BWA",
+    "GBH", "GBD", "GBA",
+    "IWH", "IWD", "IWA"
+]
+
+relevant_columns = ["Date", "HomeTeam", "AwayTeam", "Season"]
+
+# deleting the first row
+# building based on match_report
+# make a home and away prefix for each column 
+
+# Note: first build home and away team goals based on score columns
+schedule = {"week": "week","date": "date", "home_team": "home_team", "away_team": "away_team", "season": "season",
+           "home_team_goals": "home_team_goals", "away_team_goals": "away_team_goals", "match_report": "match_report",
+           "home_xg": "home_xg", "away_xg": "away_xg"}
+
+
+
+defense_data = {"Int": "int", "Blocks": "blocks", "Clr": "clr", "Err": "err", "season": "season"}
+
+passing = {"Total": "pas_tot", "Total.1" : "pas_att", "Total.4": "pgrssv_dist", "Total.3": "tot_dist", "Ast": "ast",
+           "xAG": "exp_assists_g", "xA": "exp_assists"}
+
+passing_type ={"Pass Types.5": "crosses"}
+
+shots = {"Standard.2":"SoT", "Expected": "xg","Standard.3":"SoT_over_goals", 
+         "Expected.1": "npxg", "Expected.2": "npxg_per_shot"}
+
+
 
 csv_files = [
     filepath_00 + "1819.csv",
@@ -16,7 +58,8 @@ csv_files = [
     filepath_00 + "2122.csv",
     filepath_00 + "2223.csv",
     filepath_00 + "2324.csv",
-    filepath_00 + "2425.csv"
+    filepath_00 + "2425.csv",
+    filepath_data + "2526.csv",
 ]
 
 
@@ -52,15 +95,26 @@ bookmaker_odds_cols = [
 # Define leagues, seasons, and advanced stats
 
 leagues = [
-    "ENG-Premier League",  # Premier League
+    "ENG-Premier League",  # Premier League#
+    "ESP-La Liga",  # La Liga
+    "ITA-Serie A",  # Serie A
+    "GER-Bundesliga",  # Bundesliga
+    "FRA-Ligue 1",  # Ligue 1
 ]
-seasons = ["2018-2019","2019-2020" , "2020-2021", "2021-2022", "2022-2023", "2023-2024", "2024-2025"]
+seasons = ["2005-2006", "2006-2007", "2007-2008",
+    "2008-2009", "2009-2010", "2010-2011",
+    "2011-2012", "2012-2013", "2013-2014",
+    "2014-2015", "2015-2016", "2016-2017",
+    "2017-2018",    "2018-2019","2019-2020" , "2020-2021",
+    "2021-2022", "2022-2023", "2023-2024", "2024-2025", "2025-2026"]
 
-advanced_stats = [
-        'keeper', 'shooting', 'passing', 'passing_types', 
-        'goal_shot_creation', 'defense', 'possession', 'misc'
-]
+
+advanced_stats = ["schedule","shooting","passing", "goal_shot_creation"
+"possession", "defense", "passing_types"]
     
+
+
+
 # File path where CSV files will be saved
 filepath_01 = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/fbref/"
 
@@ -212,37 +266,304 @@ MERGED_ODDS = "/Users/luisenriquekaiser/Documents/soccer_betting_forecast/data/p
 
 # script 04_01_odds_merge.py
 # Mapping dictionary
-team_name_mapping = {
-    'Man United': 'Manchester Utd',
-    'Bournemouth': 'Bournemouth',
-    'Fulham': 'Fulham',
-    'Huddersfield': 'Huddersfield',
-    'Newcastle': 'Newcastle Utd',
-    'Watford': 'Watford',
-    'Wolves': 'Wolves',
-    'Arsenal': 'Arsenal',
-    'Liverpool': 'Liverpool',
-    'Southampton': 'Southampton',
-    'Cardiff': 'Cardiff City',
-    'Chelsea': 'Chelsea',
-    'Everton': 'Everton',
-    'Leicester': 'Leicester City',
-    'Tottenham': 'Tottenham',
-    'West Ham': 'West Ham',
-    'Brighton': 'Brighton',
-    'Burnley': 'Burnley',
-    'Man City': 'Manchester City',
-    'Crystal Palace': 'Crystal Palace',
-    'Aston Villa': 'Aston Villa',
-    'Norwich': 'Norwich City',
-    'Sheffield United': 'Sheffield Utd',
-    'West Brom': 'West Brom',
-    'Leeds': 'Leeds United',
-    'Brentford': 'Brentford',
-    "Nott'm Forest": "Nott'ham Forest",
-    'Luton': 'Luton Town',
-    'Ipswich': 'Ipswich Town'
+# Variant → Canonical team name
+team_name_map = {
+    # --- France ------------------------------------------------------------
+    "Paris S-G": "Paris Saint‑Germain",
+    "Paris SG": "Paris Saint‑Germain",
+    "Lille": "Lille OSC",
+    "Marseille": "Olympique de Marseille",
+    "Nancy": "AS Nancy Lorraine",
+    "Nantes": "FC Nantes",
+    "Nice": "OGC Nice",
+    "Saint-Étienne": "AS Saint‑Étienne",
+    "St Etienne": "AS Saint‑Étienne",
+    "Sochaux": "FC Sochaux‑Montbéliard",
+    "Strasbourg": "RC Strasbourg Alsace",
+    "Le Mans": "Le Mans FC",
+    "Troyes": "ES Troyes AC",
+    "Toulouse": "Toulouse FC",
+    "Monaco": "AS Monaco",
+    "Bordeaux": "FC Girondins de Bordeaux",
+    "Lens": "RC Lens",
+    "Ajaccio": "AC Ajaccio",
+    "Gazélec Ajaccio": "Gazélec Ajaccio",
+    "Ajaccio GFCO": "Gazélec Ajaccio",
+    "Metz": "FC Metz",
+    "Lyon": "Olympique Lyonnais",
+    "Rennes": "Stade Rennais FC",
+    "Auxerre": "AJ Auxerre",
+    "Sedan": "CS Sedan Ardennes",
+    "Lorient": "FC Lorient",
+    "Valenciennes": "Valenciennes FC",
+    "Caen": "SM Caen",
+    "Le Havre": "Le Havre AC",
+    "Grenoble": "Grenoble Foot 38",
+    "Montpellier": "Montpellier HSC",
+    "Boulogne": "US Boulogne",
+    "Arles-Avignon": "AC Arles‑Avignon",
+    "Arles": "AC Arles‑Avignon",
+    "Brest": "Stade Brestois 29",
+    "Dijon": "Dijon FCO",
+    "Evian": "Evian Thonon Gaillard FC",
+    "Evian Thonon Gaillard": "Evian Thonon Gaillard FC",
+    "Reims": "Stade de Reims",
+    "Bastia": "SC Bastia",
+    "Guingamp": "En Avant Guingamp",
+    "Angers": "Angers SCO",
+    "Amiens": "Amiens SC",
+    "Nîmes": "Nîmes Olympique",
+    "Nimes": "Nîmes Olympique",
+    "Clermont Foot": "Clermont Foot 63",
+    "Clermont": "Clermont Foot 63",
+
+    # --- Italy -------------------------------------------------------------
+    "Fiorentina": "ACF Fiorentina",
+    "Livorno": "AS Livorno Calcio",
+    "Ascoli": "Ascoli Calcio 1898",
+    "Inter": "Inter Milan",
+    "Juventus": "Juventus FC",
+    "Lazio": "SS Lazio",
+    "Parma": "Parma Calcio 1913",
+    "Reggina": "Reggina 1914",
+    "Siena": "AC Siena",
+    "Udinese": "Udinese Calcio",
+    "Milan": "AC Milan",
+    "Palermo": "Palermo FC",
+    "Treviso": "Treviso FBC 1993",
+    "Sampdoria": "UC Sampdoria",
+    "Roma": "AS Roma",
+    "Messina": "ACR Messina",
+    "Cagliari": "Cagliari Calcio",
+    "Empoli": "Empoli FC",
+    "Chievo": "AC Chievo Verona",
+    "Lecce": "US Lecce",
+    "Torino": "Torino FC",
+    "Atalanta": "Atalanta BC",
+    "Catania": "Calcio Catania",
+    "Genoa": "Genoa CFC",
+    "Napoli": "SSC Napoli",
+    "Bologna": "Bologna FC 1909",
+    "Bari": "SSC Bari",
+    "Cesena": "AC Cesena",
+    "Brescia": "Brescia Calcio",
+    "Novara": "Novara FC",
+    "Pescara": "Delfino Pescara 1936",
+    "Hellas Verona": "Hellas Verona FC",
+    "Verona": "Hellas Verona FC",
+    "Sassuolo": "US Sassuolo Calcio",
+    "Frosinone": "Frosinone Calcio",
+    "Carpi": "Carpi FC 1909",
+    "Crotone": "FC Crotone",
+    "Benevento": "Benevento Calcio",
+    "SPAL": "SPAL",
+    "Spal": "SPAL",
+    "Spezia": "Spezia Calcio",
+    "Salernitana": "US Salernitana 1919",
+    "Venezia": "Venezia FC",
+    "Monza": "AC Monza",
+    "Cremonese": "US Cremonese",
+    "Como": "Como 1907",
+
+    # --- Spain -------------------------------------------------------------
+    "Alavés": "Deportivo Alavés",
+    "Alaves": "Deportivo Alavés",
+    "Athletic Club": "Athletic Bilbao",
+    "Ath Bilbao": "Athletic Bilbao",
+    "Valencia": "Valencia CF",
+    "Atlético Madrid": "Atlético Madrid",
+    "Ath Madrid": "Atlético Madrid",
+    "Celta Vigo": "Celta de Vigo",
+    "Celta": "Celta de Vigo",
+    "Cádiz": "Cádiz CF",
+    "Cadiz": "Cádiz CF",
+    "Espanyol": "RCD Espanyol",
+    "Espanol": "RCD Espanyol",
+    "Mallorca": "RCD Mallorca",
+    "Osasuna": "CA Osasuna",
+    "Sevilla": "Sevilla FC",
+    "La Coruña": "Deportivo La Coruña",
+    "La Coruna": "Deportivo La Coruña",
+    "Real Madrid": "Real Madrid",
+    "Betis": "Real Betis",
+    "Barcelona": "FC Barcelona",
+    "Getafe": "Getafe CF",
+    "Málaga": "Málaga CF",
+    "Malaga": "Málaga CF",
+    "Racing Sant": "Racing Santander",
+    "Santander": "Racing Santander",
+    "Real Sociedad": "Real Sociedad",
+    "Sociedad": "Real Sociedad",
+    "Villarreal": "Villarreal CF",
+    "Zaragoza": "Real Zaragoza",
+    "Recreativo": "Recreativo de Huelva",
+    "Gimnàstic": "Gimnàstic de Tarragona",
+    "Gimnastic": "Gimnàstic de Tarragona",
+    "Levante": "Levante UD",
+    "Real Murcia": "Real Murcia",
+    "Murcia": "Real Murcia",
+    "Almería": "UD Almería",
+    "Almeria": "UD Almería",
+    "Valladolid": "Real Valladolid",
+    "Numancia": "CD Numancia",
+    "Sporting Gijón": "Sporting de Gijón",
+    "Sp Gijon": "Sporting de Gijón",
+    "Tenerife": "CD Tenerife",
+    "Xerez": "Xerez CD",
+    "Hércules": "Hércules CF",
+    "Hercules": "Hércules CF",
+    "Granada": "Granada CF",
+    "Rayo Vallecano": "Rayo Vallecano",
+    "Vallecano": "Rayo Vallecano",
+    "Elche": "Elche CF",
+    "Eibar": "SD Eibar",
+    "Córdoba": "Córdoba CF",
+    "Cordoba": "Córdoba CF",
+    "Las Palmas": "UD Las Palmas",
+    "Leganés": "CD Leganés",
+    "Leganes": "CD Leganés",
+    "Girona": "Girona FC",
+    "Huesca": "SD Huesca",
+
+    # --- Germany -----------------------------------------------------------
+    "Bayern Munich": "FC Bayern Munich",
+    "Hamburger SV": "Hamburger SV",
+    "Hamburg": "Hamburger SV",
+    "Hannover 96": "Hannover 96",
+    "Hannover": "Hannover 96",
+    "Köln": "1. FC Köln",
+    "FC Koln": "1. FC Köln",
+    "Koln": "1. FC Köln",
+    "MSV Duisburg": "MSV Duisburg",
+    "Duisburg": "MSV Duisburg",
+    "Werder Bremen": "SV Werder Bremen",
+    "Wolfsburg": "VfL Wolfsburg",
+    "Ein Frankfurt": "Eintracht Frankfurt",
+    "Eint Frankfurt": "Eintracht Frankfurt",
+    "Eintracht Frankfurt": "Eintracht Frankfurt",
+    "Schalke 04": "FC Schalke 04",
+    "Nürnberg": "1. FC Nürnberg",
+    "Nurnberg": "1. FC Nürnberg",
+    "Leverkusen": "Bayer 04 Leverkusen",
+    "Kaiserslautern": "1. FC Kaiserslautern",
+    "Dortmund": "Borussia Dortmund",
+    "M'gladbach": "Borussia Mönchengladbach",
+    "Gladbach": "Borussia Mönchengladbach",
+    "Arminia": "Arminia Bielefeld",
+    "Bielefeld": "Arminia Bielefeld",
+    "Hertha BSC": "Hertha BSC",
+    "Hertha": "Hertha BSC",
+    "Mainz 05": "1. FSV Mainz 05",
+    "Mainz": "1. FSV Mainz 05",
+    "Stuttgart": "VfB Stuttgart",
+    "Energie Cottbus": "Energie Cottbus",
+    "Cottbus": "Energie Cottbus",
+    "AA Aachen": "Alemannia Aachen",
+    "Aachen": "Alemannia Aachen",
+    "Bochum": "VfL Bochum",
+    "Karlsruher": "Karlsruher SC",
+    "Karlsruhe": "Karlsruher SC",
+    "Hansa Rostock": "Hansa Rostock",
+    "Hoffenheim": "TSG 1899 Hoffenheim",
+    "Freiburg": "SC Freiburg",
+    "St. Pauli": "FC St. Pauli",
+    "St Pauli": "FC St. Pauli",
+    "Augsburg": "FC Augsburg",
+    "Greuther Fürth": "Greuther Fürth",
+    "Greuther Furth": "Greuther Fürth",
+    "Düsseldorf": "Fortuna Düsseldorf",
+    "Dusseldorf": "Fortuna Düsseldorf",
+    "Fortuna Dusseldorf": "Fortuna Düsseldorf",
+    "BTSV": "Eintracht Braunschweig",
+    "Braunschweig": "Eintracht Braunschweig",
+    "Paderborn 07": "SC Paderborn 07",
+    "Paderborn": "SC Paderborn 07",
+    "Darmstadt 98": "Darmstadt 98",
+    "Darmstadt": "Darmstadt 98",
+    "Ingolstadt 04": "FC Ingolstadt 04",
+    "Ingolstadt": "FC Ingolstadt 04",
+    "RB Leipzig": "RB Leipzig",
+    "Holstein Kiel": "Holstein Kiel",
+    "Union Berlin": "Union Berlin",
+    "Heidenheim": "1. FC Heidenheim",
+    "Elversberg": "SV Elversberg",
+
+    # --- England -----------------------------------------------------------
+    "Aston Villa": "Aston Villa",
+    "Everton": "Everton",
+    "Fulham": "Fulham",
+    "Manchester City": "Manchester City",
+    "Man City": "Manchester City",
+    "Middlesbrough": "Middlesbrough",
+    "Portsmouth": "Portsmouth",
+    "Sunderland": "Sunderland",
+    "West Ham": "West Ham United",
+    "Arsenal": "Arsenal",
+    "Wigan Athletic": "Wigan Athletic",
+    "Wigan": "Wigan Athletic",
+    "West Brom": "West Bromwich Albion",
+    "West Bromwich Albion": "West Bromwich Albion",
+    "Tottenham": "Tottenham Hotspur",
+    "Tottenham Hotspur": "Tottenham Hotspur",
+    "Newcastle Utd": "Newcastle United",
+    "Newcastle": "Newcastle United",
+    "Manchester Utd": "Manchester United",
+    "Man United": "Manchester United",
+    "Manchester United": "Manchester United",
+    "Charlton Ath": "Charlton Athletic",
+    "Charlton": "Charlton Athletic",
+    "Blackburn": "Blackburn Rovers",
+    "Birmingham City": "Birmingham City",
+    "Birmingham": "Birmingham City",
+    "Liverpool": "Liverpool",
+    "Bolton": "Bolton Wanderers",
+    "Bolton Wanderers": "Bolton Wanderers",
+    "Chelsea": "Chelsea",
+    "Sheffield Utd": "Sheffield United",
+    "Sheffield United": "Sheffield United",
+    "Reading": "Reading",
+    "Watford": "Watford",
+    "Derby County": "Derby County",
+    "Derby": "Derby County",
+    "Hull City": "Hull City",
+    "Hull": "Hull City",
+    "Stoke City": "Stoke City",
+    "Stoke": "Stoke City",
+    "Wolves": "Wolverhampton Wanderers",
+    "Wolverhampton Wanderers": "Wolverhampton Wanderers",
+    "Burnley": "Burnley",
+    "Blackpool": "Blackpool",
+    "QPR": "Queens Park Rangers",
+    "Queens Park Rangers": "Queens Park Rangers",
+    "Swansea City": "Swansea City",
+    "Swansea": "Swansea City",
+    "Norwich City": "Norwich City",
+    "Norwich": "Norwich City",
+    "Southampton": "Southampton",
+    "Crystal Palace": "Crystal Palace",
+    "Cardiff City": "Cardiff City",
+    "Cardiff": "Cardiff City",
+    "Leicester City": "Leicester City",
+    "Leicester": "Leicester City",
+    "Bournemouth": "Bournemouth",
+    "Brighton": "Brighton & Hove Albion",
+    "Brighton & Hove Albion": "Brighton & Hove Albion",
+    "Huddersfield": "Huddersfield Town",
+    "Huddersfield Town": "Huddersfield Town",
+    "Leeds United": "Leeds United",
+    "Leeds": "Leeds United",
+    "Brentford": "Brentford",
+    "Nottingham Forest": "Nottingham Forest",
+    "Nott'ham Forest": "Nottingham Forest",
+    "Nott'm Forest": "Nottingham Forest",
+    "Luton Town": "Luton Town",
+    "Ipswich Town": "Ipswich Town",
+    "Ipswich": "Ipswich Town",
+
+    # --- Misc --------------------------------------------------------------
+    "nan": None
 }
+
 
 
 
@@ -281,7 +602,7 @@ to_drop = [
 
 
 # script 05_01_pca.py
-  # File paths: adjust as needed
+# File paths: adjust as needed
 
 
 
